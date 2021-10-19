@@ -1,5 +1,5 @@
 function init_field()
-    addpath('C:\Users\drors\Desktop\תואר שני\תזה\field 2');
+    addpath('C:\Users\DrorSchein\Desktop\thesis\field ii');
     field_init
     close
 end

@@ -2,6 +2,7 @@
 import torch
 from torch import nn
 import numpy as np
+from torch.nn.modules import padding
 import configuration
 
 
@@ -132,3 +133,109 @@ class cnn_model(nn.Module):
         out2 = self.fc_amp(out)
         #out = out *-1e-5
         return torch.cat((out1,out2), dim = 1)
+
+
+class Dblock(nn.Module):
+    def __init__(self,in_size,out_size):
+        super(Dblock,self).__init__()
+
+        self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
+                                    nn.ReLU(),
+                                    nn.Conv1d(in_size,out_size,3,stride=2),
+                                    nn.BatchNorm1d(out_size),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,3))
+
+        self.short = nn.Conv1d(in_size,out_size,3,stride=2)
+
+    def forward(self,x):
+        identity = x
+        out = self.seq(x)
+        identity = self.short(identity)
+        return out + identity
+
+class Ublock(nn.Module):
+    def __init__(self,in_size,out_size):
+        super(Ublock,self).__init__()
+
+        self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
+                                    nn.ReLU(),
+                                    nn.ConvTranspose1d(in_size,out_size,2,stride=2),
+                                    nn.BatchNorm1d(out_size),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,3))
+
+        self.short = nn.ConvTranspose1d(in_size,out_size,2,stride=2)
+    def forward(self,x):
+        identity = x
+        out = self.seq(x)
+        identity = self.short(identity)
+        return out + identity
+class Sblock(nn.Module):
+    def __init__(self,in_size):
+        super(Dblock,self).__init__()
+        self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3),
+                                    nn.BatchNorm1d(in_size),
+                                    nn.ReLU(),
+                                    nn.Conv1d(in_size,in_size,3),
+                                    nn.ReLU())
+
+    def forward(self,x):
+        out = self.seq(x)
+        return out
+
+
+class multiResNet(nn.Module):
+    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0.2):
+        super(multiResNet, self).__init__()
+
+        #total of ten layers,
+        self.dlayers = []
+        for i in range(11):
+            self.dlayers.append(Dblock(6,6))
+        #N,6,1
+        self.ulayers = []
+        for i in range(11):
+            self.ulayers.append(Ublock(6,6))
+        self.slayers = []
+        for i in range(10):
+            self.slayers.append(Sblock(6))
+        
+        #expanding channels to 6
+        self.conv1 = nn.Sequential(nn.Conv1d(1,3,1),
+                                    nn.BatchNorm1d(3),
+                                    nn.ReLU(),
+                                    nn.Conv1d(3,6,1))
+        #reduce channels to 1
+        self.conv2 = nn.Sequential(nn.BatchNorm1d(6),
+                                    nn.ReLU(),
+                                    nn.Conv1d(6,3,1),
+                                    nn.BatchNorm1d(3),
+                                    nn.ReLU(),
+                                    nn.Conv1d(3,1,1,stride=2))
+        #reduce spatial to output size
+        self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
+                                    nn.ReLU(),
+                                    nn.Conv1d(1,1,1,stride=2),
+                                    nn.BatchNorm1d(1),
+                                    nn.ReLU(),
+                                    nn.Conv1d(1,1,1,stride=2),
+                                    nn.BatchNorm1d(1),
+                                    nn.ReLU(),
+                                    nn.Conv1d(1,1,1,stride=2))
+
+    def foward(self,x):
+        x = x.reshape(x.size(0),1,-1)
+        x = self.conv1(x)
+        ide = []
+        for i in range(10):
+            ide.append(self.slayers(x))
+            x = self.dlayers[i](x)
+        x = self.dlayers[10](x)
+        x = self.ulayers[10](x)
+        for i in range(10):
+            x = x + ide[9-i]
+            x = self.ulayers[i](x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        return x

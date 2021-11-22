@@ -1,8 +1,10 @@
 
+from re import M
 import torch
 from torch import nn
 import numpy as np
 from torch.nn.modules import padding
+from torch.nn.modules.container import Sequential
 import configuration
 
 
@@ -136,35 +138,55 @@ class cnn_model(nn.Module):
 
 
 class Dblock(nn.Module):
-    def __init__(self,in_size,out_size):
+    def __init__(self,in_size,out_size, drop = 0):
         super(Dblock,self).__init__()
-
-        self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
+        if drop == 0:
+            self.seq1 = nn.Sequential(nn.BatchNorm1d(in_size),
                                     nn.ReLU(),
-                                    nn.Conv1d(in_size,out_size,3,stride=2),
+                                    nn.Conv1d(in_size,out_size,3,stride=2, padding = 1))
+            self.seq2 = nn.Sequential(nn.BatchNorm1d(out_size),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,3,padding=1),
                                     nn.BatchNorm1d(out_size),
                                     nn.ReLU(),
-                                    nn.Conv1d(out_size,out_size,3))
+                                    nn.Conv1d(out_size,out_size,1))
+        else:
+            self.seq1 = nn.Sequential(nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(in_size,out_size,3,stride=2, padding = 1))
+            self.seq2 = nn.Sequential(nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,3, padding=1),
+                                    nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,1))
 
-        self.short = nn.Conv1d(in_size,out_size,3,stride=2)
+        self.short = nn.Conv1d(in_size,out_size,3,stride=2, padding=1)
 
     def forward(self,x):
         identity = x
-        out = self.seq(x)
+        out = self.seq1(x)
+        out = self.seq2(out)
         identity = self.short(identity)
         return out + identity
 
 class Ublock(nn.Module):
-    def __init__(self,in_size,out_size):
+    def __init__(self,in_size,out_size, drop = 0):
         super(Ublock,self).__init__()
-
-        self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
+        if drop == 0:
+            self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
                                     nn.ReLU(),
                                     nn.ConvTranspose1d(in_size,out_size,2,stride=2),
                                     nn.BatchNorm1d(out_size),
                                     nn.ReLU(),
-                                    nn.Conv1d(out_size,out_size,3))
-
+                                    nn.Conv1d(out_size,out_size,3, padding= 1))
+        else:
+            self.seq = nn.Sequential(nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.ConvTranspose1d(in_size,out_size,2,stride=2),
+                                    nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(out_size,out_size,3, padding= 1))
         self.short = nn.ConvTranspose1d(in_size,out_size,2,stride=2)
     def forward(self,x):
         identity = x
@@ -172,13 +194,22 @@ class Ublock(nn.Module):
         identity = self.short(identity)
         return out + identity
 class Sblock(nn.Module):
-    def __init__(self,in_size):
-        super(Dblock,self).__init__()
-        self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3),
+    def __init__(self,in_size, drop= 0):
+        super(Sblock,self).__init__()
+        
+        if drop == 0:
+            self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3, padding = 1),
                                     nn.BatchNorm1d(in_size),
                                     nn.ReLU(),
-                                    nn.Conv1d(in_size,in_size,3),
+                                    nn.Conv1d(in_size,in_size,3, padding = 1),
                                     nn.ReLU())
+        else:
+            self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3, padding = 1),
+                                    nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(in_size,in_size,3, padding = 1),
+                                    nn.ReLU())
+
 
     def forward(self,x):
         out = self.seq(x)
@@ -186,56 +217,280 @@ class Sblock(nn.Module):
 
 
 class multiResNet(nn.Module):
-    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0.2):
+    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0, k = 6,fcn = True):
         super(multiResNet, self).__init__()
-
-        #total of ten layers,
-        self.dlayers = []
-        for i in range(11):
-            self.dlayers.append(Dblock(6,6))
-        #N,6,1
-        self.ulayers = []
-        for i in range(11):
-            self.ulayers.append(Ublock(6,6))
-        self.slayers = []
-        for i in range(10):
-            self.slayers.append(Sblock(6))
         
-        #expanding channels to 6
-        self.conv1 = nn.Sequential(nn.Conv1d(1,3,1),
-                                    nn.BatchNorm1d(3),
+        self.k = k
+        self.k2 = int(k/2)
+        self.num_blocks = 6
+        self.is_fcn = fcn
+        #total of ten layers, 
+        self.dlayers = nn.ModuleList()
+        for i in range(self.num_blocks):
+            self.dlayers.append(Dblock(k,k, drop))
+        #N,k,1
+        self.ulayers = nn.ModuleList()
+        for i in range(self.num_blocks):
+            self.ulayers.append(Ublock(k,k, drop))
+        self.slayers = nn.ModuleList()
+        for i in range(self.num_blocks):
+            self.slayers.append(Sblock(k, drop))
+        self.sfinal = nn.Sequential(Ublock(k,k, drop),
+                                        Ublock(k,k, drop))
+        if fcn == True:
+            if drop == 0:
+            #expanding channels to k
+                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                        nn.BatchNorm1d(self.k2),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,k,1))
+            #reduce channels to 1
+                self.conv2 = nn.Sequential(nn.BatchNorm1d(k),
+                                        nn.ReLU(),
+                                        nn.Conv1d(k,self.k2,1),
+                                        nn.BatchNorm1d(self.k2),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,1,1))
+            #reduce spatial to output size
+                self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Conv1d(1,1,1,stride=2),
+                                        nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Conv1d(1,1,1,stride=2))
+            else:
+                        #expanding channels to k
+                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,k,1))
+            #reduce channels to 1
+                self.conv2 = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(k,self.k2,1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,1,1))
+            #reduce spatial to output size
+                self.conv3 = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(1,1,1,stride=2))
+                                        # nn.Dropout(drop),
+                                        # nn.ReLU(),
+                                        # nn.Conv1d(1,1,1,stride=2))
+        else:
+            if drop == 0:
+            #expanding channels to k
+                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                        nn.BatchNorm1d(self.k2),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,k,1))
+                self.fc1 = nn.Sequential(nn.Linear(k*256,self.k2*256),
+                                        nn.ReLU(),
+                                        nn.Linear(self.k2 * 256,out_size))
+            
+            else:
+                        #expanding channels to k
+                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(self.k2,k,1))
+                self.fc1 = nn.Sequential(nn.Linear(k*256,self.k2*256),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(self.k2 * 256,out_size))
+            
+            
+        self.apply(init_weights)
+
+
+    def forward(self,x):
+        x = x.reshape(x.size(0),1,-1)
+        x = self.conv1(x)
+        ide = []
+        for i in range(self.num_blocks):
+            ide.append(self.slayers[i](x))
+            x = self.dlayers[i](x)
+        for i in range(1,self.num_blocks):
+            x = self.ulayers[i](x)
+            x = x + ide[-i]
+            
+        x = self.sfinal(x)
+        if self.is_fcn == True:
+            x = self.conv2(x)
+            x = x.reshape(x.size(0), -1)
+        else:
+            x = x.reshape(x.size(0), -1)
+            x = self.fc1(x)
+        #x = self.conv3(x)
+        return x
+
+
+
+
+
+        
+class multiResNetTest(nn.Module):
+    class Dblock(nn.Module):
+        def __init__(self,in_size,out_size, drop = 0):
+            super(Dblock,self).__init__()
+            if drop == 0:
+                self.seq1 = nn.Sequential(nn.BatchNorm1d(in_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,in_size,3,stride=2, padding = 1))
+                self.seq2 = nn.Sequential(nn.BatchNorm1d(in_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,out_size,3,padding=1),
+                                        nn.BatchNorm1d(out_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(out_size,out_size,1))
+            else:
+                self.seq1 = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,in_size,3,stride=2, padding = 1))
+                self.seq2 = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,out_size,3, padding=1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(out_size,out_size,1))
+
+            self.short = nn.Conv1d(in_size,out_size,3,stride=2, padding=1)
+
+        def forward(self,x):
+            identity = x
+            out = self.seq1(x)
+            out = self.seq2(out)
+            identity = self.short(identity)
+            return out + identity
+
+    class Ublock(nn.Module):
+        def __init__(self,in_size,out_size, drop = 0):
+            super(Ublock,self).__init__()
+            if drop == 0:
+                self.seq = nn.Sequential(nn.BatchNorm1d(in_size),
+                                        nn.ReLU(),
+                                        nn.ConvTranspose1d(in_size,in_size,2,stride=2),
+                                        nn.BatchNorm1d(in_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,out_size,3, padding= 1),
+                                        nn.BatchNorm1d(out_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(out_size,out_size,1))
+            else:
+                self.seq = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.ConvTranspose1d(in_size,in_size,2,stride=2),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,out_size,3, padding= 1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(out_size,out_size,1))
+            self.short = nn.ConvTranspose1d(in_size,out_size,2,stride=2)
+        def forward(self,x):
+            identity = x
+            out = self.seq(x)
+            identity = self.short(identity)
+            return out + identity
+    class Sblock(nn.Module):
+        def __init__(self,in_size, drop= 0):
+            super(Sblock,self).__init__()
+            
+            if drop == 0:
+                self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3, padding = 1),
+                                        nn.BatchNorm1d(in_size),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,in_size,3, padding = 1),
+                                        nn.ReLU())
+            else:
+                self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3, padding = 1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(in_size,in_size,3, padding = 1),
+                                        nn.ReLU())
+
+
+        def forward(self,x):
+            out = self.seq(x)
+            return out
+
+
+    
+    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0, k = 6):
+        super(multiResNetTest, self).__init__()
+        self.k = k
+        self.k2 = int(k/2)
+        self.num_blocks = 6
+        #total of ten layers, 
+        self.dlayers = nn.ModuleList()
+        for i in range(1,self.num_blocks + 1):
+            self.dlayers.append(Dblock(k* i ,k * (i + 1), drop))
+        #N,k,1
+        self.ulayers = nn.ModuleList()
+        for i in range(self.num_blocks + 1,0,-1):
+            self.ulayers.append(Ublock(k * (i + 1),k*i, drop))
+        self.slayers = nn.ModuleList()
+        for i in range(1,self.num_blocks + 1):
+            self.slayers.append(Sblock(k * i, drop))
+        self.sfinal = nn.Sequential(Ublock(k,k, drop))
+                                       # Ublock(k,k, drop))
+        if drop == 0:
+        #expanding channels to k
+            self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                    nn.BatchNorm1d(self.k2),
                                     nn.ReLU(),
-                                    nn.Conv1d(3,6,1))
+                                    nn.Conv1d(self.k2,k,1))
         #reduce channels to 1
-        self.conv2 = nn.Sequential(nn.BatchNorm1d(6),
+            self.conv2 = nn.Sequential(nn.BatchNorm1d(k),
                                     nn.ReLU(),
-                                    nn.Conv1d(6,3,1),
-                                    nn.BatchNorm1d(3),
+                                    nn.Conv1d(k,self.k2,1),
+                                    nn.BatchNorm1d(self.k2),
                                     nn.ReLU(),
-                                    nn.Conv1d(3,1,1,stride=2))
+                                    nn.Conv1d(self.k2,1,1))
         #reduce spatial to output size
-        self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
-                                    nn.ReLU(),
-                                    nn.Conv1d(1,1,1,stride=2),
-                                    nn.BatchNorm1d(1),
+            self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
                                     nn.ReLU(),
                                     nn.Conv1d(1,1,1,stride=2),
                                     nn.BatchNorm1d(1),
                                     nn.ReLU(),
                                     nn.Conv1d(1,1,1,stride=2))
+        else:
+                    #expanding channels to k
+            self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                                    nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(self.k2,k,1))
+        #reduce channels to 1
+            self.conv2 = nn.Sequential(nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(k,self.k2,1),
+                                    nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(self.k2,1,1))
+        #reduce spatial to output size
+            self.conv3 = nn.Sequential(nn.Dropout(drop),
+                                    nn.ReLU(),
+                                    nn.Conv1d(1,1,1,stride=2))
+                                    # nn.Dropout(drop),
+                                    # nn.ReLU(),
+                                    # nn.Conv1d(1,1,1,stride=2))
+        self.apply(init_weights)
 
-    def foward(self,x):
+
+    def forward(self,x):
         x = x.reshape(x.size(0),1,-1)
         x = self.conv1(x)
         ide = []
-        for i in range(10):
-            ide.append(self.slayers(x))
+        for i in range(self.num_blocks):
+            ide.append(self.slayers[i](x))
             x = self.dlayers[i](x)
-        x = self.dlayers[10](x)
-        x = self.ulayers[10](x)
-        for i in range(10):
-            x = x + ide[9-i]
+        for i in range(1,self.num_blocks + 1):
             x = self.ulayers[i](x)
+            x = x + ide[-i]
+            
+        x = self.sfinal(x)
         x = self.conv2(x)
-        x = self.conv3(x)
+        #x = self.conv3(x)
+        x = x.reshape(x.size(0), -1)
         return x

@@ -1,5 +1,5 @@
 init_field()
-
+%%
 batch_size = 5000;
 vec_size = 1024;
 N = vec_size;
@@ -8,13 +8,30 @@ Frequancy = 4.464e6;
 v = 1490; % water in room temperature m/sec (in body  v = 1540)
 Wavelength = v/Frequancy;
 pitch = 0.218e-3; % 
+amps = zeros(batch_size,128);
+delays = zeros(batch_size,128);
 
 patterns = generate_patterns(batch_size,vec_size);
-results = zeros(batch_size,vec_size);
+results = zeros(batch_size,256);
 for i=1:batch_size
-    results(i,:) = calculateGSOrig(patterns(i,:));
-    results(i,:) = abs(results(i,:)).^2;
+    [amps(i,:) , delays(i,:)] = calculateGS(patterns(i,:));
+    %results(i,:) = calculateGS(patterns(i,:));
+    %results(i,:) = abs(results(i,:));
 end
+
+
+%%
+%current = results(:,512-128 + 1:512+128);
+e = amps(10,:) .* exp(1i * delays(10,:));
+%x = -N/2 *pitch:pitch:(N/2 - 1) * pitch;
+test(floor(N/2)-Number_of_Elements/2 + 1:floor(N/2)+Number_of_Elements/2) =  e;
+
+result = abs(FSP_X_near(test,+DZ,N,pitch,Wavelength));
+result = result / max(result);
+figure
+plot(result)
+hold on
+plot(patterns(50,:))
 %%
 figure
 subplot(2,2,1)
@@ -75,7 +92,7 @@ for i=1:batch_size
     plot(x_pattern_center,patterns(i,500-128/2 + 1:500+128/2))
 end
 %%
-batch_size = 5;
+batch_size = 5000;
 vec_size = 1001;
 N = vec_size;
 patterns = generate_patterns(batch_size,vec_size);
@@ -98,34 +115,34 @@ x_pattern = linspace(-500 * pitch,500*pitch,1001);
 x_pattern_center = linspace(-15e-3,15e-3,128);
 delays = zeros(batch_size,128);
 results = zeros(batch_size,200);
-Dx = 5 % in pitchs
+Dx = 5; % in pitchs
 Peak_Dis_mm = Dx*pitch*1e3;
 Nu_Periods = 11; % Should be odd
-patterns(1,:) = 0
+patterns(1,:) = 0;
 patterns(1,floor(N/2)+1-Dx*floor(Nu_Periods/2)+0:Dx:floor(N/2)+1+Dx*floor(Nu_Periods/2)+0) = 1;
 
 for i=1:batch_size
     [amps(i,:) , delays(i,:)] = calculateGS(patterns(i,:));
     results(i,:) = create_new_line(delays(i,:));
-    im = squeeze(create_new_image(delays(i,:)));
+    %im = squeeze(create_new_image(delays(i,:)));
 %     delay = calc_delay(128,1490,[points(i) 0 40e-3],pitch);
 %     result = create_new_line(delay);
 %     calc_im = squeeze(create_new_image(delay));
-    figure;
-    subplot(1,5,2)
-    plot(x,results(i,:))    
-    title('at image plane')
-    subplot(1,5,5)
-    plot(ele,amps(i,:))
-    title('amplitudes')
-    subplot(1,5,4)
-    plot(ele,delays(i,:))
-    title('delays')
-    subplot(1,5,1)
-    plot(x_pattern_center,patterns(i,500-128/2 + 1:500+128/2))
-    title('base pattern')
-    subplot(1,5,3)
-    imagesc(x*1e3,flip(z)*1e3,im); title('Intensity [a.u.]'); colormap jet;
+%     figure;
+%     subplot(1,5,2)
+%     plot(x,results(i,:))    
+%     title('at image plane')
+%     subplot(1,5,5)
+%     plot(ele,amps(i,:))
+%     title('amplitudes')
+%     subplot(1,5,4)
+%     plot(ele,delays(i,:))
+%     title('delays')
+%     subplot(1,5,1)
+%     plot(x_pattern_center,patterns(i,500-128/2 + 1:500+128/2))
+%     title('base pattern')
+    %subplot(1,5,3)
+    %imagesc(x*1e3,flip(z)*1e3,im); title('Intensity [a.u.]'); colormap jet;
     
 %     subplot(1,5,2)
 %     plot(x,result)    
@@ -135,6 +152,8 @@ for i=1:batch_size
 end
 
 %%
-full = [results delays amps];
-writematrix(full,'C:\Users\drors\Desktop\code for thesis\data advanced.csv')
+% full = [results delays amps];
+full = [patterns(:,512-128/2 + 1:512+128/2) amps delays];
+%%
+writematrix(full,'C:\Users\DrorSchein\Desktop\thesis\thesis\data advanced.csv')
 

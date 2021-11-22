@@ -1,5 +1,5 @@
-function [Transducer_Amp,Transducer_delay_Wavelength] = calculateGS(desired_Output_Shift)
-    N = 1001;
+function [Transducer_Amp,Transducer_Phase_Reshape] = calculateGS(desired_Output_Shift)
+    N = 1024;
     Transducer = zeros(1,N);
     GS = 10;
     DZ = 40e-3; % Distance to pattern 
@@ -16,8 +16,8 @@ function [Transducer_Amp,Transducer_delay_Wavelength] = calculateGS(desired_Outp
     %     Transducer = ones(size(Transducer)).*exp(1i*angle(Transducer)); % if you don't allow apodiztion
 %         Transducer(1:ceil(N/2)-Number_of_Elements/2) = 0;     % set to zero the pixels outside the transducer
 %         Transducer(floor(N/2)+Number_of_Elements/2:end) = 0; % set to zero the pixels outside the transducer
-        Transducer(1:501-63) = 0;     % set to zero the pixels outside the transducer
-        Transducer(501+64:end) = 0; % set to zero the pixels outside the transducer
+        Transducer(1:512-64) = 0;     % set to zero the pixels outside the transducer
+        Transducer(512+65:end) = 0; % set to zero the pixels outside the transducer
         Output = FSP_X_near(Transducer,+DZ,N,pitch,Wavelength);
     end
     Transducer_Amp = abs(Transducer(floor(N/2)-Number_of_Elements/2+1:floor(N/2)+Number_of_Elements/2));
@@ -25,7 +25,8 @@ function [Transducer_Amp,Transducer_delay_Wavelength] = calculateGS(desired_Outp
     Transducer_Phase = angle(Transducer(floor(N/2)-Number_of_Elements/2+1:floor(N/2)+Number_of_Elements/2));
     Transducer_Phase_Reshape = unwrap(Transducer_Phase);
     Transducer_Phase_Reshape = Transducer_Phase_Reshape-min(min(Transducer_Phase_Reshape));
-    Transducer_delay_Wavelength = Transducer_Phase_Reshape/(2*pi);
-    Transducer_delay_Wavelength = Transducer_delay_Wavelength /Frequancy;
+    Transducer_Phase_Reshape = Transducer_Phase_Reshape/max(Transducer_Phase_Reshape);
+    %Transducer_delay_Wavelength = Transducer_Phase_Reshape/(2*pi);
+    %Transducer_delay_Wavelength = Transducer_delay_Wavelength /Frequancy;
     
 end

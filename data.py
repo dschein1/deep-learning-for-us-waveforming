@@ -124,12 +124,8 @@ class baseDataSet(Dataset):
     def __len__(self):
         return len(self.data)
     def __getitem__(self,idx):
-        if self.mode == 'both':
-            x = self.data.iloc[idx,:configuration.IMG_X]
-            y = pd.concat([self.data.iloc[idx,configuration.IMG_X:configuration.IMG_X + 128] * 1e5,self.data.iloc[idx,configuration.IMG_X+128:]], axis = 0)
-        else:
-            x = self.data.iloc[idx,:configuration.IMG_X]
-            y = self.data.iloc[idx,configuration.IMG_X:]
+        x = self.data.iloc[idx,:configuration.IMG_X]
+        y = self.data.iloc[idx,configuration.IMG_X:]
         # if len(y) == 2 * 128:
         #     y = torch.tensor(y.values).split(128,1)
         # else:
@@ -137,10 +133,10 @@ class baseDataSet(Dataset):
         x = np.abs(x.values)
         x = torch.tensor(x)
         y = torch.tensor(y.values)
-        if self.transform_x:
-            x = self.transform_x.transform(x.reshape(1,-1)).reshape(-1)
-            y = self.transform_y.transform(y.reshape(1,-1)).reshape(-1)
-        return torch.tensor(x),torch.tensor(y)
+        # if self.transform_x:
+        #     x = self.transform_x.transform(x.reshape(1,-1)).reshape(-1)
+        #     y = self.transform_y.transform(y.reshape(1,-1)).reshape(-1)
+        return x,y
 
 
     def test_get(self,idx):
@@ -181,6 +177,7 @@ class datasetManager():
         self.train,self.val,self.test = self.create_datasets()
         self.seq_length = seq_length
         self.x_scalar = MinMaxScaler()
+        self.y_scalar = MinMaxScaler()
         self.y_scalar = MinMaxScaler()
         self.x_scalar.fit(self.train.data.iloc[:,:configuration.IMG_X])
         self.y_scalar.fit(self.train.data.iloc[:,configuration.IMG_X:])

@@ -14,6 +14,7 @@ import numpy as np
 import configuration
 import nets
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.decomposition import TruncatedSVD, PCA, KernelPCA
 
 def create_lines(eng,delays):
     delays = torch.reshape(delays,(-1,2 * 128))
@@ -124,7 +125,7 @@ class baseDataSet(Dataset):
     def __len__(self):
         return len(self.data)
     def __getitem__(self,idx):
-        x = self.data.iloc[idx,:configuration.IMG_X]
+        x = self.data.iloc[idx,:configuration.in_size]
         y = self.data.iloc[idx,configuration.IMG_X:]
         # if len(y) == 2 * 128:
         #     y = torch.tensor(y.values).split(128,1)
@@ -164,10 +165,10 @@ class baseDataSet(Dataset):
 
 class datasetManager():
     def __init__(self,seq_length = 50,csv_file = "C:/Users/drors/Desktop/code for thesis/data.csv",orig = "C:/Users/drors/Desktop/code for thesis/data original.csv"):
-        self.eng = []
-        for i in range(configuration.num_workers):
-            self.eng.append(matlab.engine.start_matlab())
-            self.eng[i].init_field(nargout=0)
+        #self.eng = []
+        #for i in range(configuration.num_workers):
+        #    self.eng.append(matlab.engine.start_matlab())
+        #    self.eng[i].init_field(nargout=0)
         self.csv_file = csv_file
         if orig == configuration.path_combined:
             self.mode = 'both'
@@ -176,20 +177,25 @@ class datasetManager():
         self.orig = orig
         self.train,self.val,self.test = self.create_datasets()
         self.seq_length = seq_length
-        self.x_scalar = MinMaxScaler()
-        self.y_scalar = MinMaxScaler()
-        self.y_scalar = MinMaxScaler()
-        self.x_scalar.fit(self.train.data.iloc[:,:configuration.IMG_X])
-        self.y_scalar.fit(self.train.data.iloc[:,configuration.IMG_X:])
-        self.train.set_transform(self.x_scalar,self.y_scalar)
-        self.test.set_transform(self.x_scalar,self.y_scalar)
-        self.val.set_transform(self.x_scalar,self.y_scalar)
+
+        # self.svd = KernelPCA(n_components=configuration.in_size, kernel='poly')
+        # self.train.data.iloc[:,:configuration.in_size] = self.svd.fit_transform(self.train.data.iloc[:,:configuration.IMG_X])
+        # self.val.data.iloc[:,:configuration.in_size] = self.svd.transform(self.val.data.iloc[:,:configuration.IMG_X])
+        # self.test.data.iloc[:,:configuration.in_size] = self.svd.transform(self.test.data.iloc[:,:configuration.IMG_X])
+    # #     self.x_scalar = MinMaxScaler()
+    #     self.y_scalar = MinMaxScaler()
+    #     self.y_scalar = MinMaxScaler()
+    #     self.x_scalar.fit(self.train.data.iloc[:,:configuration.IMG_X])
+    #     self.y_scalar.fit(self.train.data.iloc[:,configuration.IMG_X:])
+    #     self.train.set_transform(self.x_scalar,self.y_scalar)
+    #     self.test.set_transform(self.x_scalar,self.y_scalar)
+    #     self.val.set_transform(self.x_scalar,self.y_scalar)
     def create_datasets(self):
         data = pd.read_csv(self.orig,header = None,index_col = None, engine = 'python') #.applymap(lambda x: np.complex(x.replace(" ", "").replace('i','j')))
         n = len(data)
         perm = np.random.permutation(n)
-        train_idx = perm[:round(0.8*n)]
-        val_idx = perm[round(0.8*n):round(0.9*n)]
+        train_idx = perm[:round(0.75*n)]
+        val_idx = perm[round(0.75*n):round(0.9*n)]
         test_idx = perm[round(0.9*n):]
         train_dataset = baseDataSet(train_idx,data,mode = self.mode)
         val_dataset = baseDataSet(val_idx,data,mode = self.mode)
@@ -208,11 +214,11 @@ class datasetManager():
         val_dataset = baseDataSet(val_idx,data,mode = self.mode)
         test_dataset = baseDataSet(test_idx,data,mode = self.mode)
         self.train,self.val,self.test =  train_dataset,val_dataset,test_dataset
-        self.x_scalar.fit(self.train.data.iloc[:,:configuration.IMG_X])
-        self.y_scalar.fit(self.train.data.iloc[:,configuration.IMG_X:])
-        self.train.set_transform(self.x_scalar,self.y_scalar)
-        self.test.set_transform(self.x_scalar,self.y_scalar)
-        self.val.set_transform(self.x_scalar,self.y_scalar)
+        # self.x_scalar.fit(self.train.data.iloc[:,:configuration.IMG_X])
+        # self.y_scalar.fit(self.train.data.iloc[:,configuration.IMG_X:])
+        # self.train.set_transform(self.x_scalar,self.y_scalar)
+        # self.test.set_transform(self.x_scalar,self.y_scalar)
+        # self.val.set_transform(self.x_scalar,self.y_scalar)
         copyfile(self.orig,self.csv_file)
         
     def add_batch_to_data(self,batch, mode = 'create'):

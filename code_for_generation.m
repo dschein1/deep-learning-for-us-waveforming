@@ -21,9 +21,12 @@ end
 
 
 %%
+Number_of_Elements = 128;
 %current = results(:,512-128 + 1:512+128);
-e = amps(10,:) .* exp(1i * delays(10,:));
+j = 20;
+e = amps(j,:) .* exp(1i * delays(j,:));
 %x = -N/2 *pitch:pitch:(N/2 - 1) * pitch;
+test = zeros(1,N);
 test(floor(N/2)-Number_of_Elements/2 + 1:floor(N/2)+Number_of_Elements/2) =  e;
 
 result = abs(FSP_X_near(test,+DZ,N,pitch,Wavelength));
@@ -31,7 +34,7 @@ result = result / max(result);
 figure
 plot(result)
 hold on
-plot(patterns(50,:))
+plot(patterns(j,:))
 %%
 figure
 subplot(2,2,1)

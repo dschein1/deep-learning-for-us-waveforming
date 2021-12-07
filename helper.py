@@ -31,7 +31,7 @@ def fsp_x_near(source,dz = configuration.depth):
     PS=torch.exp(torch.tensor(1j, device= configuration.device)*2*np.pi*dz/configuration.Wavelength*(torch.sqrt(1-torch.pow((xx*du*configuration.Wavelength),2))))
     source = torch.fft.ifftshift(torch.fft.ifft(torch.fft.ifftshift(PS * FFT_inp)))
     abs_source= source.abs()
-    return abs_source # / torch.max(abs_source,dim = 0).values
+    return abs_source / torch.max(abs_source,dim = 1).values[:,None] # / torch.max(abs_source,dim = 0).values
 
 def loss_gs(source,target,base_loss = nn.MSELoss()):
     if source.size(1) == 256:

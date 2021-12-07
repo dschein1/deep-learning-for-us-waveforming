@@ -11,7 +11,8 @@ import configuration
 def init_weights(m):
     for name in m.named_parameters():
         if 'weight' in name[0]:
-            torch.nn.init.uniform_(name[1], a=-0.1, b=0.1)
+            if name[1].dim() != 1:
+                torch.nn.init.xavier_normal_(name[1]) #, nonlinearity='relu')
         elif 'bias' in name[0]:
             torch.nn.init.zeros_(name[1])
 
@@ -217,13 +218,16 @@ class Sblock(nn.Module):
 
 
 class multiResNet(nn.Module):
-    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0, k = 6,fcn = True):
+    def __init__(self,in_size = configuration.IMG_X,out_size = configuration.out_size,drop = 0, k = 6,reduce_conv = True):
+
         super(multiResNet, self).__init__()
         
         self.k = k
         self.k2 = int(k/2)
         self.num_blocks = 6
-        self.is_fcn = fcn
+        self.is_reduce_conv = reduce_conv
+
+        self.up = Ublock(1,1,drop)
         #total of ten layers, 
         self.dlayers = nn.ModuleList()
         for i in range(self.num_blocks):
@@ -237,20 +241,26 @@ class multiResNet(nn.Module):
             self.slayers.append(Sblock(k, drop))
         self.sfinal = nn.Sequential(Ublock(k,k, drop),
                                         Ublock(k,k, drop))
-        if fcn == True:
+        if reduce_conv == True:
             if drop == 0:
             #expanding channels to k
-                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
-                                        nn.BatchNorm1d(self.k2),
+                self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/4),1),
+                                        nn.BatchNorm1d(int(k/4)),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,k,1))
+                                        nn.Conv1d(int(k/4),int(k/2),1),
+                                        nn.BatchNorm1d(int(k/2)),
+                                        nn.ReLU(),
+                                        nn.Conv1d(int(k/2),k,1))
             #reduce channels to 1
                 self.conv2 = nn.Sequential(nn.BatchNorm1d(k),
                                         nn.ReLU(),
-                                        nn.Conv1d(k,self.k2,1),
-                                        nn.BatchNorm1d(self.k2),
+                                        nn.Conv1d(k,int(k/2),1),
+                                        nn.BatchNorm1d(int(k/2)),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,1,1))
+                                        nn.Conv1d(int(k/2),int(k/4),1),
+                                        nn.BatchNorm1d(int(k/4)),
+                                        nn.ReLU(),
+                                        nn.Conv1d(int(k/4),1,1))
             #reduce spatial to output size
                 self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
                                         nn.ReLU(),
@@ -258,19 +268,98 @@ class multiResNet(nn.Module):
                                         nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Conv1d(1,1,1,stride=2))
+                self.fc_final = nn.Sequential(nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(256,configuration.out_size),
+                                        nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size),
+                                        nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size),
+                                        nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size))
+                self.fc_amps = nn.Sequential(#nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(256,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128))
+                
+                self.fc_delays = nn.Sequential(#nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(256,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128),
+                                            #nn.BatchNorm1d(1),
+                                            nn.ReLU(),
+                                            nn.Linear(128,128))
             else:
                         #expanding channels to k
-                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/4),1),
                                         nn.Dropout(drop),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,k,1))
+                                        nn.Conv1d(int(k/4),int(k/2),1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(int(k/2),k,1))
             #reduce channels to 1
                 self.conv2 = nn.Sequential(nn.Dropout(drop),
                                         nn.ReLU(),
-                                        nn.Conv1d(k,self.k2,1),
+                                        nn.Conv1d(k,int(k/2),1),
                                         nn.Dropout(drop),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,1,1))
+                                        nn.Conv1d(int(k/2),int(k/4),1),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Conv1d(int(k/4),1,1))
+                self.fc_final = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(2 * configuration.out_size,configuration.out_size),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,configuration.out_size))
+                self.fc_amps = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128))
+                self.fc_delays = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(configuration.out_size,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(128,128))
             #reduce spatial to output size
                 self.conv3 = nn.Sequential(nn.Dropout(drop),
                                         nn.ReLU(),
@@ -281,24 +370,24 @@ class multiResNet(nn.Module):
         else:
             if drop == 0:
             #expanding channels to k
-                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
-                                        nn.BatchNorm1d(self.k2),
+                self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/2),1),
+                                        nn.BatchNorm1d(int(k/2)),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,k,1))
-                self.fc1 = nn.Sequential(nn.Linear(k*256,self.k2*256),
+                                        nn.Conv1d(int(k/2),k,1))
+                self.fc1 = nn.Sequential(nn.Linear(k*256,int(k/2)*256),
                                         nn.ReLU(),
-                                        nn.Linear(self.k2 * 256,out_size))
+                                        nn.Linear(int(k/2) * 256,out_size))
             
             else:
                         #expanding channels to k
-                self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+                self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/2),1),
                                         nn.Dropout(drop),
                                         nn.ReLU(),
-                                        nn.Conv1d(self.k2,k,1))
-                self.fc1 = nn.Sequential(nn.Linear(k*256,self.k2*256),
+                                        nn.Conv1d(int(k/2),k,1))
+                self.fc1 = nn.Sequential(nn.Linear(k*256,int(k/2)*256),
                                         nn.Dropout(drop),
                                         nn.ReLU(),
-                                        nn.Linear(self.k2 * 256,out_size))
+                                        nn.Linear(int(k/2) * 256,out_size))
             
             
         self.apply(init_weights)
@@ -306,6 +395,8 @@ class multiResNet(nn.Module):
 
     def forward(self,x):
         x = x.reshape(x.size(0),1,-1)
+        if not x.size(2) == configuration.IMG_X:
+            x = self.up(x)
         x = self.conv1(x)
         ide = []
         for i in range(self.num_blocks):
@@ -316,13 +407,23 @@ class multiResNet(nn.Module):
             x = x + ide[-i]
             
         x = self.sfinal(x)
-        if self.is_fcn == True:
+        if self.is_reduce_conv == True:
             x = self.conv2(x)
-            x = x.reshape(x.size(0), -1)
+            #print(x.shape)
+            #x.reshape(x.size(0),-1)
+            x = self.fc_final(x) #needed because of high difference between delays and amplitudes
+            x = x.reshape(x.size(0),-1)
         else:
             x = x.reshape(x.size(0), -1)
             x = self.fc1(x)
-        #x = self.conv3(x)
+        # amps = self.fc_amps(x)
+        # delays = self.fc_delays(x)
+        # #amps = amps.clone() / torch.max(amps.clone(),dim = 1).values[:,None]
+        # x = torch.cat((amps,delays),dim = 1)
+        #x[:,:128] = x[:,:128].clone() / torch.max(x.clone()[:,:128],dim = 1).values[:,None] # normalize amplitudes
+        amps = torch.ones((x.size(0),128), device = configuration.device)
+        x = torch.cat((amps,x),dim = 1)
+        #x = self.conv3(x)        
         return x
 
 
@@ -422,6 +523,7 @@ class multiResNetTest(nn.Module):
         self.k = k
         self.k2 = int(k/2)
         self.num_blocks = 6
+        self.up = Ublock(1,1,drop)
         #total of ten layers, 
         self.dlayers = nn.ModuleList()
         for i in range(1,self.num_blocks + 1):
@@ -437,17 +539,17 @@ class multiResNetTest(nn.Module):
                                        # Ublock(k,k, drop))
         if drop == 0:
         #expanding channels to k
-            self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
-                                    nn.BatchNorm1d(self.k2),
+            self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/2),1),
+                                    nn.BatchNorm1d(int(k/2)),
                                     nn.ReLU(),
-                                    nn.Conv1d(self.k2,k,1))
+                                    nn.Conv1d(int(k/2),k,1))
         #reduce channels to 1
             self.conv2 = nn.Sequential(nn.BatchNorm1d(k),
                                     nn.ReLU(),
-                                    nn.Conv1d(k,self.k2,1),
-                                    nn.BatchNorm1d(self.k2),
+                                    nn.Conv1d(k,int(k/2),1),
+                                    nn.BatchNorm1d(int(k/2)),
                                     nn.ReLU(),
-                                    nn.Conv1d(self.k2,1,1))
+                                    nn.Conv1d(int(k/2),1,1))
         #reduce spatial to output size
             self.conv3 = nn.Sequential(nn.BatchNorm1d(1),
                                     nn.ReLU(),
@@ -455,19 +557,25 @@ class multiResNetTest(nn.Module):
                                     nn.BatchNorm1d(1),
                                     nn.ReLU(),
                                     nn.Conv1d(1,1,1,stride=2))
+            self.fc_final = nn.Sequential(nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(256,256),
+                                        nn.BatchNorm1d(1),
+                                        nn.ReLU(),
+                                        nn.Linear(256,256))
         else:
                     #expanding channels to k
-            self.conv1 = nn.Sequential(nn.Conv1d(1,self.k2,1),
+            self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/2),1),
                                     nn.Dropout(drop),
                                     nn.ReLU(),
-                                    nn.Conv1d(self.k2,k,1))
+                                    nn.Conv1d(int(k/2),k,1))
         #reduce channels to 1
             self.conv2 = nn.Sequential(nn.Dropout(drop),
                                     nn.ReLU(),
-                                    nn.Conv1d(k,self.k2,1),
+                                    nn.Conv1d(k,int(k/2),1),
                                     nn.Dropout(drop),
                                     nn.ReLU(),
-                                    nn.Conv1d(self.k2,1,1))
+                                    nn.Conv1d(int(k/2),1,1))
         #reduce spatial to output size
             self.conv3 = nn.Sequential(nn.Dropout(drop),
                                     nn.ReLU(),
@@ -475,11 +583,19 @@ class multiResNetTest(nn.Module):
                                     # nn.Dropout(drop),
                                     # nn.ReLU(),
                                     # nn.Conv1d(1,1,1,stride=2))
+        
+            self.fc_final = nn.Sequential(nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(256,256),
+                                        nn.Dropout(drop),
+                                        nn.ReLU(),
+                                        nn.Linear(256,256))
         self.apply(init_weights)
 
 
     def forward(self,x):
         x = x.reshape(x.size(0),1,-1)
+        x = self.up(x)
         x = self.conv1(x)
         ide = []
         for i in range(self.num_blocks):
@@ -492,5 +608,7 @@ class multiResNetTest(nn.Module):
         x = self.sfinal(x)
         x = self.conv2(x)
         #x = self.conv3(x)
+        x = self.fc_final(x)
         x = x.reshape(x.size(0), -1)
+        x[:,:128] = x[:,:128].clone() / torch.max(x.clone()[:,:128],dim = 1).values[:,None] # normalize amplitudes
         return x

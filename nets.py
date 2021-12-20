@@ -152,14 +152,17 @@ class Dblock(nn.Module):
                                     nn.ReLU(),
                                     nn.Conv1d(out_size,out_size,1))
         else:
-            self.seq1 = nn.Sequential(nn.Dropout(drop),
-                                    nn.ReLU(),
-                                    nn.Conv1d(in_size,out_size,3,stride=2, padding = 1))
-            self.seq2 = nn.Sequential(nn.Dropout(drop),
-                                    nn.ReLU(),
-                                    nn.Conv1d(out_size,out_size,3, padding=1),
+            self.seq1 = nn.Sequential(nn.ReLU(),
                                     nn.Dropout(drop),
+                                    nn.BatchNorm1d(in_size),
+                                    nn.Conv1d(in_size,out_size,3,stride=2, padding = 1))
+            self.seq2 = nn.Sequential(nn.ReLU(),
+                                    nn.Dropout(drop),
+                                    nn.BatchNorm1d(out_size),
+                                    nn.Conv1d(out_size,out_size,3, padding=1),
                                     nn.ReLU(),
+                                    nn.Dropout(drop),
+                                    nn.BatchNorm1d(out_size),
                                     nn.Conv1d(out_size,out_size,1))
 
         self.short = nn.Conv1d(in_size,out_size,3,stride=2, padding=1)
@@ -182,11 +185,13 @@ class Ublock(nn.Module):
                                     nn.ReLU(),
                                     nn.Conv1d(out_size,out_size,3, padding= 1))
         else:
-            self.seq = nn.Sequential(nn.Dropout(drop),
-                                    nn.ReLU(),
-                                    nn.ConvTranspose1d(in_size,out_size,2,stride=2),
+            self.seq = nn.Sequential(nn.ReLU(),
                                     nn.Dropout(drop),
+                                    nn.BatchNorm1d(in_size),
+                                    nn.ConvTranspose1d(in_size,out_size,2,stride=2),
                                     nn.ReLU(),
+                                    nn.Dropout(drop),
+                                    nn.BatchNorm1d(in_size),
                                     nn.Conv1d(out_size,out_size,3, padding= 1))
         self.short = nn.ConvTranspose1d(in_size,out_size,2,stride=2)
     def forward(self,x):
@@ -206,8 +211,9 @@ class Sblock(nn.Module):
                                     nn.ReLU())
         else:
             self.seq = nn.Sequential(nn.Conv1d(in_size,in_size,3, padding = 1),
-                                    nn.Dropout(drop),
                                     nn.ReLU(),
+                                    nn.Dropout(drop),
+                                    nn.BatchNorm1d(in_size),
                                     nn.Conv1d(in_size,in_size,3, padding = 1),
                                     nn.ReLU())
 
@@ -226,7 +232,6 @@ class multiResNet(nn.Module):
         self.k2 = int(k/2)
         self.num_blocks = 6
         self.is_reduce_conv = reduce_conv
-
         self.up = Ublock(1,1,drop)
         #total of ten layers, 
         self.dlayers = nn.ModuleList()
@@ -253,7 +258,6 @@ class multiResNet(nn.Module):
                                         nn.Conv1d(int(k/2),k,1))
             #reduce channels to 1
                 self.conv2 = nn.Sequential(nn.BatchNorm1d(k),
-                                        nn.ReLU(),
                                         nn.Conv1d(k,int(k/2),1),
                                         nn.BatchNorm1d(int(k/2)),
                                         nn.ReLU(),
@@ -268,16 +272,16 @@ class multiResNet(nn.Module):
                                         nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Conv1d(1,1,1,stride=2))
-                self.fc_final = nn.Sequential(nn.BatchNorm1d(1),
+                self.fc_final = nn.Sequential(#nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Linear(256,configuration.out_size),
-                                        nn.BatchNorm1d(1),
+                                        #nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Linear(configuration.out_size,configuration.out_size),
-                                        nn.BatchNorm1d(1),
+                                        #nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Linear(configuration.out_size,configuration.out_size),
-                                        nn.BatchNorm1d(1),
+                                        #nn.BatchNorm1d(1),
                                         nn.ReLU(),
                                         nn.Linear(configuration.out_size,configuration.out_size))
                 self.fc_amps = nn.Sequential(#nn.BatchNorm1d(1),
@@ -308,33 +312,41 @@ class multiResNet(nn.Module):
             else:
                         #expanding channels to k
                 self.conv1 = nn.Sequential(nn.Conv1d(1,int(k/4),1),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        nn.Dropout(drop),
+                                        nn.BatchNorm1d(int(k/4)),
                                         nn.Conv1d(int(k/4),int(k/2),1),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        nn.Dropout(drop),
+                                        nn.BatchNorm1d(int(k/2)),
                                         nn.Conv1d(int(k/2),k,1))
             #reduce channels to 1
                 self.conv2 = nn.Sequential(nn.Dropout(drop),
-                                        nn.ReLU(),
+                                        nn.BatchNorm1d(int(k)),
                                         nn.Conv1d(k,int(k/2),1),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        nn.Dropout(drop),
+                                        nn.BatchNorm1d(int(k/2)),
                                         nn.Conv1d(int(k/2),int(k/4),1),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        nn.Dropout(drop),
+                                        nn.BatchNorm1d(int(k/4)),
                                         nn.Conv1d(int(k/4),1,1))
-                self.fc_final = nn.Sequential(nn.Dropout(drop),
+                self.fc_final = nn.Sequential(nn.ReLU(),
+                                        #nn.Dropout(drop),
+                                        #nn.BatchNorm1d(1),
+                                        nn.Linear(256,configuration.out_size),
                                         nn.ReLU(),
-                                        nn.Linear(2 * configuration.out_size,configuration.out_size),
-                                        nn.Dropout(drop),
-                                        nn.ReLU(),
+                                        #nn.Dropout(drop),
+                                        #nn.BatchNorm1d(1),
                                         nn.Linear(configuration.out_size,configuration.out_size),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        #nn.Dropout(drop),
+                                        #nn.BatchNorm1d(1),                                       
                                         nn.Linear(configuration.out_size,configuration.out_size),
-                                        nn.Dropout(drop),
                                         nn.ReLU(),
+                                        #nn.Dropout(drop),
+                                        #nn.BatchNorm1d(1),
                                         nn.Linear(configuration.out_size,configuration.out_size))
                 self.fc_amps = nn.Sequential(nn.Dropout(drop),
                                         nn.ReLU(),
@@ -393,25 +405,38 @@ class multiResNet(nn.Module):
         self.apply(init_weights)
 
 
-    def forward(self,x):
+    def forward(self,x, print_outs = False):
         x = x.reshape(x.size(0),1,-1)
         if not x.size(2) == configuration.IMG_X:
             x = self.up(x)
         x = self.conv1(x)
+        if print_outs:
+            print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
         ide = []
         for i in range(self.num_blocks):
             ide.append(self.slayers[i](x))
             x = self.dlayers[i](x)
+            if print_outs:
+                print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
+        
         for i in range(1,self.num_blocks):
             x = self.ulayers[i](x)
             x = x + ide[-i]
-            
+            if print_outs:
+                print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
+        
         x = self.sfinal(x)
+        if print_outs:
+            print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
         if self.is_reduce_conv == True:
             x = self.conv2(x)
+            if print_outs:
+                print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
             #print(x.shape)
             #x.reshape(x.size(0),-1)
             x = self.fc_final(x) #needed because of high difference between delays and amplitudes
+            if print_outs:
+                print(torch.mean(torch.mean(x).values(),dim = 1), dim = 1)
             x = x.reshape(x.size(0),-1)
         else:
             x = x.reshape(x.size(0), -1)

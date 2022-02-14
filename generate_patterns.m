@@ -1,6 +1,7 @@
-function patterns = generate_patterns(batch_size,N)
+function patterns = generate_patterns(batch_size,N, num_focus)
     patterns = zeros(batch_size,N);
-    number_in_each = randi(1,batch_size,1);
+    number_in_each = randi(2 ^ (num_focus - 1),batch_size,1);
+    number_in_each = floor(log2(number_in_each)) + 1;
     %number_in_each = ones(batch_size,1);
     Frequancy = 4.464e6; 
     v = 1490; % water in room temperature m/sec (in body  v = 1540)
@@ -12,8 +13,8 @@ function patterns = generate_patterns(batch_size,N)
     Transducer_size = pitch*Number_of_Elements;
     Diffraction_limit=1.22*Wavelength*DZ/Transducer_size;
     min_distance = 3 *  Diffraction_limit/pitch; % in units of the vector
-    lower = round(N/2 - 30e-3/pitch);
-    upper = round(N/2 + 30e-3/pitch);
+    lower = round(N/2 - 15e-3/pitch);
+    upper = round(N/2 + 15e-3/pitch) - 1;
     for i = 1:batch_size
         points = zeros(1,number_in_each(i)) - 100;
         j=1;
@@ -24,7 +25,6 @@ function patterns = generate_patterns(batch_size,N)
                 j = j + 1;
             end
         end
-        point
         patterns(i,points) = 1;
     end
 end

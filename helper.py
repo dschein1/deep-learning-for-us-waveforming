@@ -20,8 +20,10 @@ def diff(x, dim=-1, same_size=True):
     else:
         return x[:,1:]-x[:,:-1]
 
-def fsp_x_near(source,dz = configuration.depth):
-    source =  F.pad(source,(512 - 64,512 - 64),'constant',0)# torch.zeros(source.size()[0],configuration.IMG_X).to(configuration.device) 
+@torch.jit.script
+def fsp_x_near(source):
+    dz = configuration.depth
+    source =  F.pad(source,(512 - 64,512 - 64),'constant',0.0)# torch.zeros(source.size()[0],configuration.IMG_X).to(configuration.device) 
     #new_source[:,int(configuration.IMG_X/2) - int(source.size()[1]/2):int(configuration.IMG_X/2) + int(source.size()[1]/2)] = source
     #print(new_source.shape)
     FFT_inp = torch.fft.fftshift(torch.fft.fft(torch.fft.fftshift(source)))
@@ -54,3 +56,35 @@ def extract_amp_delays(transducer):
     amp = torch.abs(transducer)
     amp = amp / torch.max(amp,dim = 1)
     phase = torch.angle(transducer)
+
+
+def RMSE(yhat,y):
+    return torch.sqrt(torch.mean((yhat-y)**2))
+
+@torch.jit.script    
+def create_wave_for_propagation(source):
+    if source.shape[1] == 128:
+        return torch.ones(source.shape, device=configuration.device) * torch.exp(torch.tensor(1j) * source)
+    else:
+        return source[:,:128] * torch.exp(1j * source[:,128:])
+@torch.jit.script
+def fsp_x_near_for_image(source,dz : float = configuration.depth):
+    
+    source =  F.pad(source,(512 - 64,512 - 64),'constant',0.0)# torch.zeros(source.size()[0],configuration.IMG_X).to(configuration.device) 
+    #new_source[:,int(configuration.IMG_X/2) - int(source.size()[1]/2):int(configuration.IMG_X/2) + int(source.size()[1]/2)] = source
+    #print(new_source.shape)
+    du=1/configuration.pitch/1024
+    FFT_inp = torch.fft.fftshift(torch.fft.fft(torch.fft.fftshift(source)))
+    #xx = torch.arange(-int(configuration.IMG_X/2),int(configuration.IMG_X/2)) #.to(configuration.device)
+    xx = torch.arange(-int(1024/2),int(1024/2), device= configuration.device)
+    PS=torch.exp(torch.tensor(1j, device= configuration.device)*2*np.pi*dz/configuration.Wavelength*(torch.sqrt(1-torch.pow((xx*du*configuration.Wavelength),2))))
+    source = torch.fft.ifftshift(torch.fft.ifft(torch.fft.ifftshift(PS * FFT_inp)))
+    abs_source= source.abs()
+    return abs_source
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+    

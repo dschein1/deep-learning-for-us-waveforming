@@ -1,4 +1,4 @@
-function [Transducer_Amp,Transducer_Phase] = calculateGS(desired_Output_Shift)
+function [Transducer_Amp,Transducer_Phase] = calculateGS(desired_Output_Shift, allow_amps)
     N = 1024;
     Transducer = zeros(1,N);
     GS = 10;
@@ -13,8 +13,10 @@ function [Transducer_Amp,Transducer_Phase] = calculateGS(desired_Output_Shift)
         Output = (desired_Output_Shift.^0.5).*exp(1i*angle(Output));
 %         Output=circshift(Output,[0,3]);
         Transducer = FSP_X_near(Output,-DZ,N,pitch,Wavelength);
-        Transducer = ones(size(Transducer)).*exp(1i*angle(Transducer)); % if you don't allow apodiztion
-%         Transducer(1:ceil(N/2)-Number_of_Elements/2) = 0;     % set to zero the pixels outside the transducer
+        if allow_amps == false
+            Transducer = ones(size(Transducer)).*exp(1i*angle(Transducer)); % if you don't allow apodiztion
+        end
+% Transducer(1:ceil(N/2)-Number_of_Elements/2) = 0;     % set to zero the pixels outside the transducer
 %         Transducer(floor(N/2)+Number_of_Elements/2:end) = 0; % set to zero the pixels outside the transducer
         Transducer(1:512-64) = 0;     % set to zero the pixels outside the transducer
         Transducer(512+65:end) = 0; % set to zero the pixels outside the transducer

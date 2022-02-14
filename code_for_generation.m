@@ -23,7 +23,7 @@ end
 %%
 Number_of_Elements = 128;
 %current = results(:,512-128 + 1:512+128);
-j = 150;
+j = 30;
 e = amps(j,:) .* exp(1i * delays(j,:));
 %x = -N/2 *pitch:pitch:(N/2 - 1) * pitch;
 test = zeros(1,N);
@@ -156,7 +156,7 @@ end
 
 %%
 % full = [results delays amps];
-full = [patterns(:,512-128/2 + 1:512+128/2) amps delays];
+full = [patterns(:,512-512/2 + 1:512+512/2) amps delays];
 %%
-writematrix(full,'C:\Users\DrorSchein\Desktop\thesis\thesis\data small single focus.csv')
+writematrix(full,'C:\Users\DrorSchein\Desktop\thesis\thesis\data small single focus only delays.csv')
 

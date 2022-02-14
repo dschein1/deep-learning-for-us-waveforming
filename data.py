@@ -1,6 +1,9 @@
 
+from cgi import test
+from email.mime import base
+from importlib_metadata import csv
 import torch
-from torch import nn
+from torch import chunk, dtype, nn
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -11,10 +14,68 @@ import matlab.engine
 from concurrent.futures import ThreadPoolExecutor
 from scipy.spatial import distance_matrix
 import numpy as np
+from zmq import device
 import configuration
 import nets
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.decomposition import TruncatedSVD, PCA, KernelPCA
+import json 
+import os
+import dask.dataframe as dd
+import dask
+from dask.distributed import Client
+import time
+
+column_types = {str(i):'int8' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
+column_types.update({str(i):'int8' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
+column_types_second = {str(i):'float32' for i in range(641,641 + 128)}
+column_types.update(column_types_second)
+column_names_no_amps = [str(i) for i in range(1,513)].append([str(i) for i in range(641,641 + 128)])
+column_names_with_amps = [str(i) for i in range(1,641 + 128)]
+BASE_FILE_SIZE = 1000
+def split_data(path):
+    os.mkdir(path + 'train data/')
+    os.mkdir(path + 'val data/')
+    os.mkdir(path + 'test data/')
+    train_data = pd.read_parquet(path + 'train.parquet').astype(column_types)
+    _ = [train_data.iloc[i * BASE_FILE_SIZE:i * BASE_FILE_SIZE + BASE_FILE_SIZE,:].to_parquet(path + 'train data/' + str(i) + '.parquet') for i in range(0,int(train_data.shape[0] / BASE_FILE_SIZE))]        
+    val_data = pd.read_parquet(path + 'train.parquet').astype(column_types)
+    _ = [val_data.iloc[i * BASE_FILE_SIZE:i * BASE_FILE_SIZE + BASE_FILE_SIZE,:].to_parquet(path + 'val data/' + str(i) + '.parquet') for i in range(0,int(val_data.shape[0] / BASE_FILE_SIZE))]        
+    test_data = pd.read_parquet(path + 'train.parquet').astype(column_types)
+    _ = [test_data.iloc[i * BASE_FILE_SIZE:i * BASE_FILE_SIZE + BASE_FILE_SIZE,:].to_parquet(path + 'test data/' + str(i) + '.parquet') for i in range(0,int(test_data.shape[0] / BASE_FILE_SIZE))]        
+
+def test_collate_fn(batch):
+    x_list, y_list = [], []
+    for _x,_y in batch:
+        x_list.append(_x)
+        y_list.append(_y)
+    
+    new_x_list = torch.as_tensor(np.reshape(np.asarray(dask.compute(x_list),(configuration.batch_size, -1))))
+    new_y_list = torch.as_tensor(np.reshape(np.asarray(dask.compute(y_list),(configuration.batch_size, -1))))
+    if new_y_list.shape[1] == 128:
+        new_y_list = F.pad(new_y_list,(128,0),'constant',1)
+
+    return new_x_list, new_y_list
+def convert_csv_to_parquet(path):
+    #size = os.path.getsize(path + '.csv')
+    #data = dd.read_csv(path +'.csv',header = None,index_col = None).to_parquet(path + '.csv')
+    if os.path.exists(path + '.parquet'):
+        data = dd.read_parquet(path + '.parquet').astype(column_types)
+    elif os.path.exists(path + '/base data/'):
+        data = dd.read_parquet(path + '/base data/*.parquet') #.set_index('0').astype(column_types)
+        print(data.columns)
+        data = data.set_index(data.columns[0]).astype(column_types)
+    else:
+        data = dd.read_csv(path +'.csv',dtype =  column_types).set_index('0').astype(column_types)
+    print(data.dtypes,data.columns)
+    n = len(data)
+    perm = np.random.permutation(n)
+    train_idx = np.sort(perm[:round(0.75*n)])
+    val_idx = np.sort(perm[round(0.75*n):round(0.95*n)])
+    test_idx = np.sort(perm[round(0.9*n):])
+    train_data = data.loc[train_idx,:].to_parquet(path + '/train.parquet')
+    val_data = data.loc[val_idx,:].to_parquet(path + '/val.parquet')
+    test_data = data.loc[test_idx,:].to_parquet(path + '/test.parquet')
+    #data.set_index('0',sorted = True).to_parquet(path + '.parquet')
+    #data.to_pickle(path +'.gzip')
 
 def create_lines(eng,delays):
     delays = torch.reshape(delays,(-1,2 * 128))
@@ -31,10 +92,19 @@ def create_lines(eng,delays):
 def create_images(eng,delays):
     delays = torch.reshape(delays,(-1,2 * 128))
     (delays, amps) = torch.split(delays,128,1)
+    Frequancy = 4.464e6
+    
     batch_size = delays.shape[0]
-    batch = np.zeros((batch_size,configuration.IMG_Y, configuration.IMG_X))
+    batch = np.zeros((batch_size,configuration.IMG_Y, 200))
     for i in range(batch_size):
-        delay = matlab.double(delays[i].tolist())
+        #delay = matlab.double(delays[i].tolist())
+        transducer_phase = np.asarray(delays[i])
+        transducer_phase = np.unwrap(transducer_phase)
+        transducer_phase = transducer_phase-min(transducer_phase)
+        transducer_phase = transducer_phase/max(transducer_phase)
+        Transducer_delay_Wavelength = transducer_phase/(2*np.pi)
+        Transducer_delay_Wavelength = Transducer_delay_Wavelength /Frequancy
+        delay = matlab.double(Transducer_delay_Wavelength.tolist())
         amp = matlab.double(amps[i].tolist())
         batch[i,:,:] = np.asarray(eng.create_new_image(delay,amp))
     # delays = matlab.double(delays.tolist())
@@ -96,7 +166,57 @@ def create_patterns_1d(amount,N,seq_length = 50):
             #patterns[i,lower:upper] += to_apply
     return torch.from_numpy(patterns)
 
+class ModelManager():
+    def __init__(self) -> None:
+        try: 
+            with open(configuration.path_to_prev_results,'r') as prev_res:
+                self.prev_results = json.load(prev_res)
+        except IOError:
+            self.prev_results = {}
+    
+    def save_checkpoint(self,num_focus,net,optimizer,train_loss,val_loss, base_training_params):
+        if configuration.out_size == 128:
+            name = f'{num_focus},delays'
+        else:
+            name = f'{num_focus},delays and amps'
+        if name in self.prev_results and min(val_loss) > self.prev_results[name]:
+            return
+        self.prev_results[name] = min(val_loss)
+        state = {
+            'net' : net.state_dict(),
+            'train loss': train_loss,
+            'val loss': val_loss,
+            'optimizer state': optimizer.state_dict(),
+            'base training params' : base_training_params,
+            'out_size' : configuration.out_size
+        }
+        if configuration.out_size == 128:
 
+            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
+        else:
+            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
+
+        torch.save(state,path_to_save)
+        with open(configuration.path_to_prev_results, "w") as write_file:
+            json.dump(self.prev_results, write_file)
+
+    def load_checkpoint(self,num_focus):
+        if configuration.out_size == 128:
+            name = f'{num_focus},delays'
+        else:
+            name = f'{num_focus},delays and amps'
+        if name in self.prev_results:
+            if configuration.out_size == 128:
+                path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays jit.pt')
+                if not os.path.isfile(path_to_load):
+                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
+            else:
+                path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays jit.pt')
+                if not os.path.isfile(path_to_load):
+                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
+            checkpoint = torch.load(path_to_load)
+            return checkpoint
+        
 class complex_normalize(object):
     def __init__(self) -> None:
         super().__init__()
@@ -111,29 +231,161 @@ class complex_normalize(object):
     def reverse(self,sample):
         return (sample * self.abs) + self.abs
 
+
+
+class dataSingleton():
+    __instance = None
+    @staticmethod 
+    def getInstance():
+      """ Static access method. """
+      if dataSingleton.__instance == None:
+        dataSingleton()
+      return dataSingleton.__instance
+    def __init__(self):
+      """ Virtually private constructor. """
+      if dataSingleton.__instance != None:
+        raise Exception("This class is a singleton!")
+      else:
+        dataSingleton.__instance = self
+
+    def load_data(self,base_path):
+        if 'amps' in base_path:
+            self.data_train = pd.read_parquet(base_path + '/train.parquet').astype(column_types)
+            self.data_val = pd.read_parquet(base_path + '/val.parquet').astype(column_types)
+            self.data_test = pd.read_parquet(base_path + '/train.parquet').astype(column_types)
+
+        else:
+            self.data_train = pd.read_parquet(base_path + '/train.parquet').astype(column_types)
+            if not 'amps' in base_path:
+                self.data_train = self.data_train.drop(columns=[str(i) for i in range(513,513 + 128)])      
+            self.data_val = pd.read_parquet(base_path + '/val.parquet').astype(column_types)
+            if not 'amps' in base_path:
+                self.data_val = self.data_val.drop(columns=[str(i) for i in range(513,513 + 128)])
+            self.data_test = pd.read_parquet(base_path + '/train.parquet').astype(column_types)
+            if not 'amps' in base_path:
+                self.data_test = self.data_test.drop(columns=[str(i) for i in range(513,513 + 128)])
+    def get_len_data(self,type_of_data):
+        if type_of_data == 'train':
+            return len(self.data_train)
+        elif type_of_data == 'val':
+            return len(self.data_val)
+        return len(self.data_test)
+        
+    def get_data(self,type_of_data):
+        if type_of_data == 'train':
+            return self.data_train
+        elif type_of_data == 'val':
+            return self.data_val
+        return self.data_test
+    def get_row(self,type_of_data,idx):
+        if type_of_data == 'train':
+            return self.data_train.iloc[idx,:].values
+        elif type_of_data == 'val':
+            return self.data_val.iloc[idx,:].values
+        return self.data_test.iloc[idx,:].values
+
 class baseDataSet(Dataset):
-    def __init__(self,indexes,source_data,seq_length = 50 ,csv_file = "C:/Users/drors/Desktop/code for thesis/data.csv",transforms = None, mode = 'both'):
+    def __init__(self,indexes = None,source_data = None,seq_length = 50 ,file_path = "C:/Users/drors/Desktop/code for thesis/data.csv",transforms = None, mode = 'both',
+                    from_file = False, from_singleton = False,type_of_data = 'train', lazy = False):
+
         #self.data = pd.read_csv(csv_file,header = None, index_col = 0,skiprows = )
-        self.data = source_data.iloc[indexes,:].copy()
-        self.csv = csv_file
+        self.from_file = from_file
+        self.from_singleton = False
+        self.lazy = lazy
+        if not from_file:
+            self.data = source_data.loc[indexes,:].compute()
+        elif from_singleton:
+            self.from_singleton = from_singleton
+            self.type_of_data = type_of_data
+            self.singleton = dataSingleton.getInstance()
+        elif from_file and not lazy:
+            self.data = pd.read_parquet(file_path).astype(column_types)
+            if not 'amps' in file_path:
+                self.data = self.data.drop(columns=[str(i) for i in range(513,513 + 128)])
+                self.droped = False 
+        elif from_file and lazy:
+            if not 'amps' in file_path:
+                self.droped = False
+        else:
+            if True: #os.path.getsize(file_path) < 1e6 and False:
+                self.data = dd.read_parquet(file_path).astype(column_types)
+                if not 'amps' in file_path:
+                    self.data = self.data.drop(columns=[str(i) for i in range(513,513 + 128)])
+                    self.droped = True
+                self.lookup_table = {i:j  for j,i in zip(self.data.index,range(len(self.data)))}
+            else:
+                self.data = None
+                data = dd.read_parquet(file_path)
+                self.num_rows_partition = np.asarray(data.map_partitions(len).compute())
+                self.num_rows = len(data)
+                self.chunk_size = self.num_rows_partition[0]
+                #self.lookup = 
+
+
+        #new_index = np.arange(self.data.shape[0])
+        #self.data['0'] = pd.Series(new_index)
+        #self.data = self.data.set_index('0')
+        self.path = file_path
         self.measure = nn.CosineSimilarity()
         self.seq_length = seq_length
         self.mode = mode
         self.converters = {}
         self.transform_x = False
         self.transform_y = False
+
+
     def __len__(self):
-        return len(self.data)
+        if self.from_singleton:
+            return self.singleton.get_len_data(self.type_of_data)
+        if self.lazy == True:
+            return len(os.listdir(self.path)) * BASE_FILE_SIZE
+        if type(self.data) != None:
+            return len(self.data)
+        else:
+            return self.num_rows
     def __getitem__(self,idx):
-        x = self.data.iloc[idx,:configuration.in_size]
-        y = self.data.iloc[idx,configuration.IMG_X:]
+        if self.from_singleton:
+            row = self.singleton.get_row(self.type_of_data,idx)
+        elif self.from_file and not self.lazy:
+            row = self.data.iloc[idx,:].values
+        elif self.from_file and self.lazy:
+            file_name = self.path + str(idx // BASE_FILE_SIZE) + '.parquet'
+            row = pd.read_parquet(file_name)
+            #print(row.shape, idx % BASE_FILE_SIZE, idx // BASE_FILE_SIZE)
+            row = row.iloc[idx % BASE_FILE_SIZE,:].values
+        elif type(self.data) != None:
+            idx = self.lookup_table[idx]
+            row = self.data.loc[idx,:] #.compute()
+        else:
+            chunk_id = np.where(self.num_rows_partition )
+            chunk_id = idx // self.chunk_size
+            row_idx = idx % self.chunk_size
+            if 'amps' in self.path:
+                data = pd.read_parquet(self.path + '/' + str(chunk_id) + '.parquet')
+            else:
+                data = pd.read_parquet(self.path + '/part.' + str(chunk_id) + '.parquet', columns=column_names_no_amps)
+            row = data.iloc[row_idx]
+
+        #row = np.asarray(row.values)
+        #row = torch.as_tensor(np.asarray(row)).flatten()
+        if self.from_singleton or self.from_file:
+            x = torch.as_tensor(row[:configuration.in_size])
+            y = torch.as_tensor(row[configuration.in_size:])
+            if self.droped:
+                y = F.pad(y,(128,0),'constant',1)
+        else:
+            x = row[:configuration.in_size]
+            y = row[configuration.in_size:]
+            
+        # x = self.data.iloc[idx,:configuration.in_size]
+        # y = self.data.iloc[idx,configuration.in_size:]
         # if len(y) == 2 * 128:
         #     y = torch.tensor(y.values).split(128,1)
         # else:
         #     y = torch.tensor(y.values)
-        x = np.abs(x.values)
-        x = torch.tensor(x)
-        y = torch.tensor(y.values)
+        # x = np.abs(x.values)
+        # x = torch.tensor(x)
+        # y = torch.tensor(y.values)
         # if self.transform_x:
         #     x = self.transform_x.transform(x.reshape(1,-1)).reshape(-1)
         #     y = self.transform_y.transform(y.reshape(1,-1)).reshape(-1)
@@ -164,11 +416,20 @@ class baseDataSet(Dataset):
         self.transform_y = transform_y
 
 class datasetManager():
-    def __init__(self,seq_length = 50,csv_file = "C:/Users/drors/Desktop/code for thesis/data.csv",orig = "C:/Users/drors/Desktop/code for thesis/data original.csv"):
+    def __init__(self,seq_length = 50,csv_file = "C:/Users/drors/Desktop/code for thesis/data.csv",orig = "C:/Users/drors/Desktop/code for thesis/data original.csv",
+                    num_focuses = 0):
         #self.eng = []
         #for i in range(configuration.num_workers):
         #    self.eng.append(matlab.engine.start_matlab())
         #    self.eng[i].init_field(nargout=0)
+
+        if num_focuses != 0:
+            if configuration.out_size == 256:
+                path = f'{num_focuses} focus data delays amps'
+            else:
+                path = f'{num_focuses} focus data delays'
+            csv_file = os.path.join(configuration.base_path_datasets,path)
+            orig = os.path.join(configuration.base_path_datasets,path)
         self.csv_file = csv_file
         if orig == configuration.path_combined:
             self.mode = 'both'
@@ -177,7 +438,7 @@ class datasetManager():
         self.orig = orig
         self.train,self.val,self.test = self.create_datasets()
         self.seq_length = seq_length
-
+        #client = Client()  # start distributed scheduler locally.  Launch dashboard
         # self.svd = KernelPCA(n_components=configuration.in_size, kernel='poly')
         # self.train.data.iloc[:,:configuration.in_size] = self.svd.fit_transform(self.train.data.iloc[:,:configuration.IMG_X])
         # self.val.data.iloc[:,:configuration.in_size] = self.svd.transform(self.val.data.iloc[:,:configuration.IMG_X])
@@ -191,15 +452,21 @@ class datasetManager():
     #     self.test.set_transform(self.x_scalar,self.y_scalar)
     #     self.val.set_transform(self.x_scalar,self.y_scalar)
     def create_datasets(self):
-        data = pd.read_csv(self.orig,header = None,index_col = None, engine = 'python') #.applymap(lambda x: np.complex(x.replace(" ", "").replace('i','j')))
-        n = len(data)
-        perm = np.random.permutation(n)
-        train_idx = perm[:round(0.75*n)]
-        val_idx = perm[round(0.75*n):round(0.9*n)]
-        test_idx = perm[round(0.9*n):]
-        train_dataset = baseDataSet(train_idx,data,mode = self.mode)
-        val_dataset = baseDataSet(val_idx,data,mode = self.mode)
-        test_dataset = baseDataSet(test_idx,data,mode = self.mode)
+        if not os.path.exists(self.orig + '/train.parquet'):
+            convert_csv_to_parquet(self.orig)
+        if not os.path.exists(self.orig + '/train data/0.parquet'):
+            split_data(self.orig + '/')
+        #singleton = dataSingleton.getInstance()
+        #singleton.load_data(self.orig)
+        #train_dataset = baseDataSet(from_singleton=True,type_of_data='train', from_file=True)
+        #val_dataset = baseDataSet(from_singleton=True,type_of_data='val', from_file=True)
+        #test_dataset = baseDataSet(from_singleton=True,type_of_data='test', from_file=True)
+        train_dataset = baseDataSet(file_path=self.orig + '/train.parquet',from_file= True, lazy=False)
+        val_dataset = baseDataSet(file_path=self.orig + '/val.parquet',from_file= True, lazy=False)
+        test_dataset = baseDataSet(file_path=self.orig + '/test.parquet',from_file=True, lazy=False)
+        #train_dataset = baseDataSet(train_idx,data,mode = self.mode)
+        #val_dataset = baseDataSet(val_idx,data,mode = self.mode)
+        #test_dataset = baseDataSet(test_idx,data,mode = self.mode)
         return train_dataset,val_dataset,test_dataset
     def get_datasets(self):
         return self.train,self.val,self.test
@@ -294,3 +561,34 @@ class datasetManager():
             res[round(size_eng * i):round(size_eng *(i+1)),:,:] = line
         return res
 
+
+
+
+from multiprocessing.reduction import ForkingPickler, AbstractReducer
+import multiprocessing as torch_mp
+class ForkingPickler2(ForkingPickler):
+    def __init__(self, *args):
+        if len(args) > 1:
+            args[1] = 2
+        else:
+            args.append(2)
+        super().__init__(*args)
+
+    @classmethod
+    def dumps(cls, obj, protocol=4):
+        return ForkingPickler.dumps(obj, protocol)
+
+
+def dump(obj, file, protocol=4):
+    ForkingPickler2(file, protocol).dump(obj)
+
+
+class Pickle2Reducer(AbstractReducer):
+    ForkingPickler = ForkingPickler2
+    register = ForkingPickler2.register
+    dump = dump
+
+
+
+ctx = torch_mp.get_context()
+ctx.reducer = Pickle2Reducer()

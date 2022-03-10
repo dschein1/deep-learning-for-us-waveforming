@@ -1,0 +1,1 @@
+net = importONNXLayers("checkpoints\net for 10 focuses only delays.onnx")

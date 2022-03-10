@@ -20,7 +20,6 @@ def diff(x, dim=-1, same_size=True):
     else:
         return x[:,1:]-x[:,:-1]
 
-@torch.jit.script
 def fsp_x_near(source):
     dz = configuration.depth
     source =  F.pad(source,(512 - 64,512 - 64),'constant',0.0)# torch.zeros(source.size()[0],configuration.IMG_X).to(configuration.device) 
@@ -61,13 +60,11 @@ def extract_amp_delays(transducer):
 def RMSE(yhat,y):
     return torch.sqrt(torch.mean((yhat-y)**2))
 
-@torch.jit.script    
 def create_wave_for_propagation(source):
     if source.shape[1] == 128:
         return torch.ones(source.shape, device=configuration.device) * torch.exp(torch.tensor(1j) * source)
     else:
         return source[:,:128] * torch.exp(1j * source[:,128:])
-@torch.jit.script
 def fsp_x_near_for_image(source,dz : float = configuration.depth):
     
     source =  F.pad(source,(512 - 64,512 - 64),'constant',0.0)# torch.zeros(source.size()[0],configuration.IMG_X).to(configuration.device) 

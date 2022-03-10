@@ -166,6 +166,18 @@ def create_patterns_1d(amount,N,seq_length = 50):
             #patterns[i,lower:upper] += to_apply
     return torch.from_numpy(patterns)
 
+def convulve_with_sinc(input):
+    pitch = configuration.pitch
+    x_aranged = np.arange(-256 * pitch ,256 * pitch,pitch)
+    sinc = np.abs(np.sinc(1045.61 * x_aranged)) ** 2
+    sinc[:256 - 50] = 0
+    sinc[256 + 50:] = 0
+    if input.ndim == 2:
+        x_conv = np.apply_along_axis(np.convolve,1,input,sinc,mode = 'same')
+    else:
+        x_conv = np.convolve(input,sinc,mode = 'same')
+    return x_conv
+
 class ModelManager():
     def __init__(self) -> None:
         try: 
@@ -216,7 +228,33 @@ class ModelManager():
                     path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
             checkpoint = torch.load(path_to_load)
             return checkpoint
-        
+    
+    def convert_model_to_onnx(self,num_focus):
+        if configuration.out_size == 128:
+            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.onnx')
+        else:
+            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.onnx')
+        checkpoint = self.load_checkpoint(num_focus)
+        torch_model = checkpoint['net']
+        params = checkpoint['base training params']
+        net = nets.multiResNet(drop = 0, k = params['k'], reduce_conv = params['reduce_conv'], expansion_factor=params['expansion_factor'],num_blocks=params['num_blocks'])
+        net.load_state_dict(torch_model, strict= False)
+        net = net.eval()
+        x = torch.randn(configuration.batch_size,configuration.in_size,requires_grad=True)
+        torch_out = net(x)
+        torch.onnx.export(net,               # model being run
+                  x,                         # model input (or a tuple for multiple inputs)
+                  path_to_save,              # where to save the model (can be a file or file-like object)
+                  export_params=True,        # store the trained parameter weights inside the model file
+                  opset_version=10,          # the ONNX version to export the model to
+                  do_constant_folding=True,  # whether to execute constant folding for optimization
+                  input_names = ['input data'],   # the model's input names
+                  output_names = ['output data'], # the model's output names
+                  dynamic_axes={'input data' : {0 : 'batch_size'},    # variable length axes
+                                'output data' : {0 : 'batch_size'}},
+                verbose=True)
+
+
 class complex_normalize(object):
     def __init__(self) -> None:
         super().__init__()
@@ -369,6 +407,7 @@ class baseDataSet(Dataset):
         #row = np.asarray(row.values)
         #row = torch.as_tensor(np.asarray(row)).flatten()
         if self.from_singleton or self.from_file:
+            x = convulve_with_sinc(x)
             x = torch.as_tensor(row[:configuration.in_size])
             y = torch.as_tensor(row[configuration.in_size:])
             if self.droped:
@@ -376,7 +415,7 @@ class baseDataSet(Dataset):
         else:
             x = row[:configuration.in_size]
             y = row[configuration.in_size:]
-            
+        
         # x = self.data.iloc[idx,:configuration.in_size]
         # y = self.data.iloc[idx,configuration.in_size:]
         # if len(y) == 2 * 128:

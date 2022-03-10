@@ -131,10 +131,19 @@ TX.Apod = ones(1,Trans.numelements);  % set TX.Apod for 128 elements
 Pitch = 0.218e-3; % Element size [m]
 Fill_Factor = 1;
 width = Pitch*Fill_Factor;
-addpath('C:\Users\Administrator\Documents\MATLAB\Raphael');
-vector_delay = calc_delay(128,width,1540,[5,0,50]/1000)*Trans.frequency*1e6; % wavelengths units
+folder = 'C:\Users\Administrator\Documents\MATLAB\Dror'; 
+addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
+loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\data.mat');
+from_net = loaded.from_net(2,:);
+from_gs = loaded.from_gs(1,:);
+delays = from_net;
+delays = unwrap(delays);
+delays = delays - min(delays);
+delays = delays / (2 * pi);
+%delays = delays /Trans.frequency;
+vector_delay = calc_delay(128,Pitch,1540,[5,0,50]/1000)*Trans.frequency*1e6; % wavelengths units
 % vector_delay = calc_delay(128,width,1540,[5,0,50]/1000)*1540e3; % mm units
-TX.Delay = vector_delay;
+TX.Delay = delays;
 
 % 5.9 Specify Receive structure arrays. 
 maxAcqLength = ceil(sqrt(P.aperture^2 + P.endDepth^2 - 2*P.aperture*P.endDepth*cos(P.theta-pi/2)) - P.startDepth);
@@ -243,7 +252,7 @@ UI(1).Control =  {'UserB7','Style','VsSlider','Label','Sens. Cutoff',...
 UI(1).Callback = text2cell('%SensCutoffCallback');
 
 % - Range Change
-MinMaxVal = [64,300,P.endDepth]; % default unit is wavelength
+MinMaxVal = [0,1000,P.endDepth]; % default unit is wavelength
 AxesUnit = 'wls';
 if isfield(Resource.DisplayWindow(1),'AxesUnits')&&~isempty(Resource.DisplayWindow(1).AxesUnits)
     if strcmp(Resource.DisplayWindow(1).AxesUnits,'mm');
@@ -259,7 +268,9 @@ UI(2).Callback = text2cell('%RangeChangeCallback');
 frameRateFactor = 3;
 
 % Save all the structures to a .mat file.
-save('MatFiles/P6-3Flash');
+save('MatFiles\test-from-net');
+filename = 'test-from-net';
+VSX
 return
 
 

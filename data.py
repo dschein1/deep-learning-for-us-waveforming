@@ -10,7 +10,6 @@ from torch.utils.data import Dataset, DataLoader
 from shutil import copyfile
 import pandas as pd
 import matplotlib.pyplot as plt
-import matlab.engine
 from concurrent.futures import ThreadPoolExecutor
 from scipy.spatial import distance_matrix
 import numpy as np

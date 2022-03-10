@@ -18,6 +18,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 out_size = 128
 base_path_datasets = "C:/Users/DrorSchein/Desktop/thesis/thesis/datasets/"
 path_to_checkpoints = 'C:/Users/DrorSchein/Desktop/thesis/thesis/checkpoints'
+path_to_channel = 'C:/Users/DrorSchein/Desktop/thesis/thesis/py to matlab/'
 path_to_prev_results = 'C:/Users/DrorSchein/Desktop/thesis/thesis/previous results.json'
 path_double_focus_delays = "C:/Users/DrorSchein/Desktop/thesis/thesis/double focus only delays.csv"
 path_triple_focus_delays = "C:/Users/DrorSchein/Desktop/thesis/thesis/3 focus data delays only.csv"

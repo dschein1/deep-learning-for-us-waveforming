@@ -1,0 +1,8 @@
+cached-property==1.5.2
+cachetools==4.2.4
+charset-normalizer==2.0.11
+google-auth==1.35.0
+pyarrow==6.0.1
+pyasn1-modules==0.2.8
+tensorboard-data-server==0.6.1
+torch-tb-profiler==0.3.1

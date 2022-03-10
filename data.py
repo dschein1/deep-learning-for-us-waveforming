@@ -407,8 +407,8 @@ class baseDataSet(Dataset):
         #row = np.asarray(row.values)
         #row = torch.as_tensor(np.asarray(row)).flatten()
         if self.from_singleton or self.from_file:
-            x = convulve_with_sinc(x)
-            x = torch.as_tensor(row[:configuration.in_size])
+            x = convulve_with_sinc(row[:configuration.in_size])
+            x = torch.as_tensor(x)
             y = torch.as_tensor(row[configuration.in_size:])
             if self.droped:
                 y = F.pad(y,(128,0),'constant',1)

@@ -119,3 +119,4 @@ dmypy.json
 *.pickle
 runs/*
 *.json
+*.onnx

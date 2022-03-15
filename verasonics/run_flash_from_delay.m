@@ -1,3 +1,4 @@
+function run_flash_from_delay(delay)
 % Notice: 
 %   This file is provided by Verasonics to end users as a programming
 %   example for the Verasonics Vantage Research Ultrasound System.
@@ -22,7 +23,6 @@
 % Last update:
 % 12/13/2015 - modified for SW 3.0
 
-clear all
 
 P.startDepth = 0;
 P.endDepth = 320;   % Acquisition depth in wavelengths
@@ -133,9 +133,7 @@ Fill_Factor = 1;
 width = Pitch*Fill_Factor;
 folder = 'C:\Users\Administrator\Documents\MATLAB\Dror\'; 
 addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
-loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\data.mat');
-from_net = loaded.from_net(2,:);
-from_gs = loaded.from_gs(1,:);
+from_net = delay;
 delays = from_net;
 delays = unwrap(delays);
 delays = delays - min(delays);
@@ -338,3 +336,6 @@ assignin('base','Control', Control);
 assignin('base', 'action', 'displayChange');
 return
 %RangeChangeCallback
+
+
+end

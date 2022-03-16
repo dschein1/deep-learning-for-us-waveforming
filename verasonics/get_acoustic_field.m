@@ -1,4 +1,4 @@
-function [info, data] = get_acoustic_field(L1,L3,d1,d3)
+function [info, data] = get_acoustic_field(L1,L2,L3,d1,d2,d3)
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Script for sending commands to the Newport ESP300 motion controller and
@@ -33,17 +33,15 @@ function [info, data] = get_acoustic_field(L1,L3,d1,d3)
 %     d1 = 0.1; % resolution along axis 1 (in mm)
 %     d2 = 0.1; % resolution along axis 2 (in mm)  
 %     d3 = 1; % resolution along axis 3 (in mm)  
-    L2 = 0;
-    d2 = 1;
     Nx = round(L3/d3+1); % number of points for axis 3, Nx needs to be odd at the moment
     Ny = L1/d1+1; % number of points for axis 1
     Nz = L2/d2+1; % number of points for axis 2
     N = Nx*Ny*Nz; % total number of points
-
+                                  
     data = [];
 
     % Set velocity, acceleration and deceleration for electric motors
-    V = 4 ; % velocity (in mm/s)
+    V = 4 ; % velocity (in mm/s)                                       
     Ac = 20 ; % acceleration (in mm/s^2)
     Dc = 20 ; % deceleration (in mm/s^2)
 

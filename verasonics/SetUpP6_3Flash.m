@@ -24,7 +24,7 @@
 
 clear all
 
-P.startDepth = 0;
+P.startDepth = 50;
 P.endDepth = 200;   % Acquisition depth in wavelengths
 
 % 2.1 Define system parameters.

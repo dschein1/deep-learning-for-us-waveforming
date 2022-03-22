@@ -7,10 +7,8 @@ Frequancy = 4.464e6;
 
 pattern(490) = 1;
 pattern(520) = 1;
-pattern = generate_patterns(1,1024,8);
-pattern = pattern(1,:);
 [amps, delays] = calculateGS(pattern,true);
-delays = delays / (2*pi);
+delays = delays / pi;
 delays = delays / Frequancy;
 % figure
 % subplot(1,3,1)

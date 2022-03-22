@@ -28,8 +28,8 @@ function total_result = create_new_image(delays,amp)
     excitation = sin(2*pi*f0*te+pi); % Excitation signal
     xdc_excitation(Th, excitation);
     xdc_apodization(Th, 0, Apo');
-    x_min = -15e-3;
-    x_max = 15e-3;
+    x_min = -30e-3;
+    x_max = 30e-3;
     z_min = 10e-3;
     z_max = 80e-3;
     x = linspace(x_min,x_max,200);

@@ -11,7 +11,6 @@ xx = -N/2:N/2-1;
     FFT_inp=fftshift(fft(fftshift(inp)));
     du=1/dx/N;
     PS=exp(1i*2*pi*Z/lambda*(sqrt(1-(xx*du*lambda).^2)));
- 
     out=ifftshift(ifft(ifftshift(PS.*FFT_inp)));
     pixel_out_size=dx;
     

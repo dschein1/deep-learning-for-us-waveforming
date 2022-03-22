@@ -33,8 +33,6 @@ desired_Output(floor(N/2)+1-Dx*floor(Nu_Periods/2)+0:Dx:floor(N/2)+1+Dx*floor(Nu
 % desired_Output=0.5+0.5*sin(2*pi*x*f0);
 % desired_Output(1:round(N/2)-(Nu_Periods*Dx)/2) = 0;     % set to zero the pixels outside the transducer
 % desired_Output(round(N/2)+(Nu_Periods*Dx)/2+1:end) = 0; % set to zero the pixels outside the transducer
-desired_Output = generate_patterns(1,1024,8);
-desired_Output = desired_Output(1,:);
 
 % desired_Output(501)=1;
 %%
@@ -86,7 +84,9 @@ end
 %% FSP
 % Transducer_2pix=circshift(Transducer,[0,-500]);
 Transducer_2pix = Transducer(256:768 - 1);
+%%
 Transducer_2pix = imresize(Transducer_2pix,2,'box');
+%%
 Transducer_2pix = Transducer_2pix(1,1:N);
 %%
 [amps,delays] = calculateGS(desired_Output,false);
@@ -116,9 +116,7 @@ plot(angle(new_transducer)); title('angle from function')
 index = 1
 for z0 = z
 %     [E_FSP1_z0(index,:)] = FSP_X_near(Transducer,z0,N,pitch,Wavelength);
-    %[E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
-
-    [E_FSP1_z0(index,:)] = FSP_X_near(Transducer_2pix,z0,N,pitch_half,Wavelength);
+    [E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
     index = index + 1;
     z0/z_max;
 end
@@ -135,8 +133,10 @@ I_FSP1_z0 = abs(E_FSP1_z0).^2;
 % xlim([-Transducer_size*1e3/2,+Transducer_size*1e3/2]); xlabel('x[mm]'); ylabel('z[mm]');
 
 % error
+%%
+plot(abs(Transducer_2pix))
 
-
+%%
 figure
 subplot(1,2,2)
 set(gcf, 'Position',[0,0,1000,1000]);

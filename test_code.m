@@ -1,15 +1,19 @@
 init_field
 
 %%
-delays_calc = calc_delay(128,0.218e-3,1490,[0 0 40]/1000); 
-pattern = zeros(1,1024);
+pitch = 0.218e-3;
+delays_calc = calc_delay(128,pitch,1490,[0 0 40]/1000); 
+pattern= zeros(1,1024);
 Frequancy = 4.464e6; 
+pattern(512) = 1;
+ %pattern(490) = 1;
+ %pattern(530) = 1;
+ pattern = generate_patterns(1,1024,6);
+ pattern = pattern(1,:);
 
-pattern(490) = 1;
-pattern(520) = 1;
-pattern = generate_patterns(1,1024,8);
-pattern = pattern(1,:);
 [amps, delays] = calculateGS(pattern,true);
+delays = unwrap(delays);
+new_transducer = amps .* exp(1i * delays);
 delays = delays / (2*pi);
 delays = delays / Frequancy;
 % figure
@@ -21,21 +25,59 @@ delays = delays / Frequancy;
 % plot(delays ./ delays_calc); title('delays from GS divided by delays from calculation')
 
 
-im_from_calculated = create_new_image(delays_calc);
-im_from_gs = create_new_image(delays,amps);
+im_from_calculated = squeeze(create_new_image(delays_calc));
+im_from_field = squeeze(create_new_image(delays,amps));
+% figure
+% subplot(2,2,1)
+% imagesc(x * 1e3,z_field * 1e3,im_from_calculated); colormap jet; axis square; axis on; zoom(1); title('from field ii based on calculation')
+% subplot(2,2,2)
+% imagesc(x * 1e3,z_field * 1e3,im_from_field); colormap jet; axis square; axis on; zoom(1); title('from field ii based on gs')
+% subplot(2,2,3)
+% plot(x * 1e3,im_from_calculated(round(40e-3 / dz_field - 10e-3/dz_field),:)); colormap jet; axis square; axis on; zoom(1); title('from field ii at depth 40 mm based on calculation')
+% subplot(2,2,4)
+% plot(x * 1e3,im_from_field(round(40e-3 / dz_field - 10e-3/dz_field),:)); colormap jet; axis square; axis on; zoom(1); title('from field ii at depth 40 mm based on gs')
 
-x_min = -30-3;
+
+pitch_half = pitch/2;
+x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
+dz = 0.1e-3;
+z_max = 2*40e-3;
+z = 0:dz:z_max;
+new_transducer = padarray(new_transducer,[0 ((1024 - 128) / 2)]);
+new_transducer = new_transducer(1,256:768 -1);
+new_transducer = imresize(new_transducer,2,'box');
+
+new_transducer = new_transducer(1,1:N);
+
+
+index = 1
+for z0 = z
+%     [E_FSP1_z0(index,:)] = FSP_X_near(Transducer,z0,N,pitch,Wavelength);
+    %[E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+
+    [E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+    index = index + 1;
+    z0/z_max;
+end
+I_FSP1_z0 = abs(E_FSP1_z0).^2;
+
+x_min = -30e-3;
 x_max = 30e-3;
 z_min = 10e-3;
 z_max = 80e-3;
 x = linspace(x_min,x_max,200);
-z = linspace(z_min,z_max,300);
+z_field = linspace(z_min,z_max,300);
+dz_field = (80e-3 - 10e-3)/300;
+index = find(z_field == 40e-3);
 figure
-subplot(1,2,1)
-imagesc(x,z,squeeze(im_from_calculated)); colormap jet; axis square; axis on; zoom(1); title('from calculated')
-subplot(1,2,2)
-imagesc(x,z,squeeze(im_from_gs)); colormap jet; axis square; axis on; zoom(1); title('from gs')
-
+subplot(2,2,1)
+imagesc(x_half * 1e3,z * 1e3,I_FSP1_z0); colormap jet; axis square; axis on; zoom(1); title('from gs full image')
+subplot(2,2,2)
+imagesc(x * 1e3,z_field * 1e3,im_from_field); colormap jet; axis square; axis on; zoom(1); title('from field ii full image')
+subplot(2,2,4)
+plot(x * 1e3,im_from_field(round(40e-3 / dz_field - 10e-3/dz_field),:)); title('from field ii at depth 40 mm')
+subplot(2,2,3)
+plot(x_half * 1e3,I_FSP1_z0(40e-3/dz,:)); title('from gs at depth 40 mm');
 %%
 
 desired_Output_Shift = generate_patterns(1,1024);

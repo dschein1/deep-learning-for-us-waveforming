@@ -49,10 +49,10 @@ function total_result = create_new_image(delays,amp)
         end
         im = im - min(min(im));
         im = im/max(max(im));
-        db_val = 40;
-        const_b = 10^(-db_val/20);
-        const_a = 1-const_b;
-        im = 20*log10(const_a * im +const_b);
+        %db_val = 40;
+        %const_b = 10^(-db_val/20);
+        %const_a = 1-const_b;
+        %im = 20*log10(const_a * im +const_b);
         total_result(i,:,:) = im;
     end
 %     z_repeat = reshape(repmat(z,1,100),[],1);

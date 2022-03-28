@@ -225,7 +225,7 @@ class ModelManager():
                 path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays jit.pt')
                 if not os.path.isfile(path_to_load):
                     path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
-            checkpoint = torch.load(path_to_load)
+            checkpoint = torch.load(path_to_load,map_location = configuration.device)
             return checkpoint
     
     def convert_model_to_onnx(self,num_focus):

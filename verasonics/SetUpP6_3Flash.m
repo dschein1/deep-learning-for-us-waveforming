@@ -133,20 +133,34 @@ Fill_Factor = 1;
 width = Pitch*Fill_Factor;
 folder = 'C:\Users\Administrator\Documents\MATLAB\Dror\'; 
 addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
-loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\data.mat');
-from_net = loaded.from_net(3,:);
-from_gs = loaded.from_gs(1,:);
-delays = from_net;
+loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data.mat');
+from_net = loaded.from_net(1,:);
+from_net = unwrap(from_net);
+from_net = from_net - min(min(from_net));
+from_net = from_net / (2 * pi);
+%from_gs = loaded.from_gs(1,:);
+patterns = zeros(1,1024);
+patterns(512 - 5) = 1;
+patterns(512 + 5) = 1;
+[amps, delays] = calculateGS(patterns,false);
+%delays = from_net;
+
 delays = unwrap(delays);
-%delays = delays / (2 * pi);
 delays = delays - min(min(delays));
+
+%delays = delays / (2 * pi);
 delays = delays / ( 2 * pi);
+figure
+subplot(1,2,1)
+plot(delays);
+subplot(1,2,2)
+plot(from_net)
 %delays = delays / (Trans.frequency * 1e6);
-%delays = delays /Trans.frequency;
+%delays = delays /Trans.frequ ency;
 %delays = load('C:\Users\Administrator\Documents\Matlab\Dror\verasonics\delays_example.txt','-ascii');
 vector_delay = calc_delay(128,Pitch,1490,[0,0,40]/1000)*Trans.frequency*1e6; % wavelengths units
 % vector_delay = calc_delay(128,width,1540,[5,0,50]/1000)*1540e3; % mm units
-TX.Delay = vector_delay;
+TX.Delay = delays;
 
 % 5.9 Specify Receive structure arrays. 
 maxAcqLength = ceil(sqrt(P.aperture^2 + P.endDepth^2 - 2*P.aperture*P.endDepth*cos(P.theta-pi/2)) - P.startDepth);

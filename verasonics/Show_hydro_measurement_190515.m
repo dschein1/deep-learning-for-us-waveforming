@@ -9,7 +9,7 @@ x = -4.5:0.1:4.5;
 % data=squeeze(data_SAMI4MHz_204060); z = 18:0.25:66;
 % data=squeeze(data_SAMI3MHz_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMI4MHz_305070); z = 28:0.25:76;
-data=squeeze(data_SAMI6MHz_305070); z = 28:0.25:76;
+data=squeeze(data_to_show); z = 28:0.25:76;
 % data=squeeze(data_SAMIinc_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMIdec_305070); z = 28:0.25:76;
 

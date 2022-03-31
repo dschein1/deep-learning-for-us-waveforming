@@ -1,29 +1,46 @@
 init_field
 
-%%
 pitch = 0.218e-3;
 delays_calc = calc_delay(128,pitch,1490,[0 0 40]/1000); 
 pattern= zeros(1,1024);
 Frequancy = 4.464e6; 
+v = 1490; % water in room temperature m/sec (in body  v = 1540)
+Wavelength = v/Frequancy;
 patterns = zeros(1,1024);
-patterns(490) = 1;
-patterns(500) = 1;
-patterns(510) = 1;
-patterns(520) = 1;
-[amps, delays] = calculateGS(patterns,false);
- pattern = generate_patterns(1,1024,6);
- pattern = patterns(1,:);
+%patterns(490) = 1;
+%patterns(500) = 1;
+patterns(512 - 5) = 1;
+patterns(512 + 5) = 1;
+[amps, delays_gs] = calculateGS(patterns,false);
+loaded = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\single_data.mat');
+delays = double(loaded.from_net(1,:));
+%delays = delays_gs;
+amps = ones(1,128);
+%  pattern = generate_patterns(1,1024,6);
+%  pattern = patterns(1,:);
+% 
+% [amps, delays] = calculateGS(pattern,true);
 
-[amps, delays] = calculateGS(pattern,true);
-delays = unwrap(delays);
 new_transducer = amps .* exp(1i * delays);
+ delays_gs = delays_gs - min(min(delays_gs));
+delays_gs = unwrap(delays_gs);
+delays_gs = delays_gs / (2*pi);
+delays_gs = delays_gs / Frequancy;
+
+ delays = delays - min(min(delays));
+delays = unwrap(delays);
 delays = delays / (2*pi);
 delays = delays / Frequancy;
-% figure
-% subplot(1,3,1)
-% plot(delays_calc); title('delays calculated');
-% subplot(1,3,2)
-% plot(delays); title('delays from GS');
+figure
+subplot(1,2,1)
+plot(delays_gs); title('delays from gs');
+subplot(1,2,2)
+ plot(delays); title('delays from model');
+%  delays = delays - min(min(delays));
+% delays = unwrap(delays);
+% delays = delays / (2*pi);
+% delays = delays / Frequancy;
+ 
 % subplot(1,3,3)
 % plot(delays ./ delays_calc); title('delays from GS divided by delays from calculation')
 
@@ -33,14 +50,14 @@ im_from_field = squeeze(create_new_image(delays,amps));
 % figure
 % subplot(2,2,1)
 % imagesc(x * 1e3,z_field * 1e3,im_from_calculated); colormap jet; axis square; axis on; zoom(1); title('from field ii based on calculation')
-% subplot(2,2,2)
+% subplot(2,2,2)    
 % imagesc(x * 1e3,z_field * 1e3,im_from_field); colormap jet; axis square; axis on; zoom(1); title('from field ii based on gs')
 % subplot(2,2,3)
 % plot(x * 1e3,im_from_calculated(round(40e-3 / dz_field - 10e-3/dz_field),:)); colormap jet; axis square; axis on; zoom(1); title('from field ii at depth 40 mm based on calculation')
 % subplot(2,2,4)
 % plot(x * 1e3,im_from_field(round(40e-3 / dz_field - 10e-3/dz_field),:)); colormap jet; axis square; axis on; zoom(1); title('from field ii at depth 40 mm based on gs')
 
-
+N = 1024;
 pitch_half = pitch/2;
 x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
 dz = 0.1e-3;
@@ -158,7 +175,6 @@ hold on
 plot(base_padded(ii,:))
 
 %%
-data -
 %%
 
 a = angle(Transducer_Amp .* exp(1i * Transducer_Phase_Reshape));

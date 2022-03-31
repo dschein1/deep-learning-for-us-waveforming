@@ -19,7 +19,7 @@ function total_result = create_new_image(delays,amp)
     set_sampling(fs);
     set_field('c',c);
     Ts = 1/fs; % Sampling period
-    T = Number_of_cycles*2/f0;
+    T = Number_of_cycles * 2/f0;
     te = 0:Ts:T; % Time vector
     Th = xdc_linear_array (Number_of_Elements, width, height, kerf, 4, 1, focus);
     impulse_response=sin(2*pi*f0*te+pi);

@@ -5,12 +5,11 @@ clear data; clear P
 % x = -L1/2:d1:L1/2;
 % z = -L2/2:d2:L2/2;
 x = -4.5:0.01:4.5;
-load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\results_double_net_gs.mat', 'data')
+
 % data=squeeze(data_SAMI4MHz_204060); z = 18:0.25:66;
 % data=squeeze(data_SAMI3MHz_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMI4MHz_305070); z = 28:0.25:76;
-%data=squeeze(data_to_show); 
-z = 15:0.1:75;
+data=squeeze(data_to_show); z = 15:0.1:75;
 % data=squeeze(data_SAMIinc_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMIdec_305070); z = 28:0.25:76;
 
@@ -20,11 +19,10 @@ for m=1:size(data,1)
 %              P(m,n)=max(data(m,n).signal)-min(data(m,n).signal);
 %              P(m,n) = P(m,n)/2;
              P(m,n)=min(data(m,n).signal);
-             %P(m,n)=max(data(m,n).signal);
-
-            if abs(P(m,n))>1024
-                P(m,n)=0;
+            if abs(P(m,n))>3000
+                P(m,n)=3000;
             end
+%              P(m,n)=max(data(m,n).signal);
 %              P(m,n)=sum(abs(data(m,n).signal))/10000;
 %              P(m,n)=sqrt(mean(data(m,n).signal.^2));
          else
@@ -34,15 +32,15 @@ for m=1:size(data,1)
      end
 end
 %              figure; plot(data(m,n).signal) ; error
-P = P.^2;
 
 P(isnan(P)) = 0;
-%     db_val = 20;
-%      P = P - min(min(P));
-%      P = P/max(max(P));
-%      const_b=10^(-db_val/20);
-%      const_a=1-const_b;
-%      P = 20*log10(const_a * P + const_b);
+    db_val = 1;
+    P = P - min(min(P));
+    P = P/max(max(P));
+    const_b=10^(-db_val/20);
+    const_a=1-const_b;
+    P = 20*log10(const_a * P + const_b);
+P = P.^2;
 % P = fill)missing(P,'spline'); % Clean NaN points
 % Result = fillmissing(Result,'spline'); % Clean NaN points
 

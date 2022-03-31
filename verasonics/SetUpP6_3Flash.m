@@ -134,7 +134,7 @@ width = Pitch*Fill_Factor;
 folder = 'C:\Users\Administrator\Documents\MATLAB\Dror\'; 
 addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
 loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data.mat');
-from_net = loaded.from_net(1,:);
+from_net = double(loaded.from_net(1,:));
 from_net = unwrap(from_net);
 from_net = from_net - min(min(from_net));
 from_net = from_net / (2 * pi);
@@ -160,7 +160,7 @@ plot(from_net)
 %delays = load('C:\Users\Administrator\Documents\Matlab\Dror\verasonics\delays_example.txt','-ascii');
 vector_delay = calc_delay(128,Pitch,1490,[0,0,40]/1000)*Trans.frequency*1e6; % wavelengths units
 % vector_delay = calc_delay(128,width,1540,[5,0,50]/1000)*1540e3; % mm units
-TX.Delay = delays;
+TX.Delay = from_net;
 
 % 5.9 Specify Receive structure arrays. 
 maxAcqLength = ceil(sqrt(P.aperture^2 + P.endDepth^2 - 2*P.aperture*P.endDepth*cos(P.theta-pi/2)) - P.startDepth);

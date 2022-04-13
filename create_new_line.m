@@ -3,7 +3,8 @@ function total_result = create_new_line(delays,	amp)
     delays (1,:)
     amp (1,:) = ones(1,128)
     end
-    depth = 35e-3;
+    init_field
+    depth = 40e-3;
     Number_of_cycles=1; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 
     c = 1490; % water in room temperature m/sec (in body  v = 1540)
@@ -14,7 +15,7 @@ function total_result = create_new_line(delays,	amp)
     kerf = pitch*(1-Fill_Factor); % Kerf [m]
     width = pitch*Fill_Factor; % Width of element
     fs=100e6; %Sampling frequency
-    focus = [0 0 46]/1000;
+    focus = [0 0 40]/1000;
     
     Apo= amp';
     set_sampling(fs);
@@ -29,14 +30,14 @@ function total_result = create_new_line(delays,	amp)
     excitation = sin(2*pi*f0*te+pi); % Excitation signal
     xdc_excitation(Th, excitation);
     xdc_apodization(Th, 0, Apo');
-    total_result = zeros(size(delays,1),200);
+    total_result = zeros(size(delays,1),512);
     %%generating the actual line
     for i=1:size(delays,1)
         xdc_focus_times(Th,0,delays(i,:));
-        x_min = -15e-3;
-        x_max = 15e-3;
-        x = linspace(x_min,x_max,200);
-        points = zeros(200,3);
+        x_min = -(256 - 1) * pitch;
+        x_max = 256 * pitch;
+        x = x_min:pitch:x_max;
+        points = zeros(512,3);
         points(:,1) = x';
         points(:,3) = depth;
 %     point = [0 0 depth];

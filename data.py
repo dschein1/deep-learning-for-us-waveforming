@@ -21,7 +21,7 @@ import os
 import dask.dataframe as dd
 import dask
 from dask.distributed import Client
-import time
+import matlab
 
 column_types = {str(i):'int8' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
 column_types.update({str(i):'int8' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
@@ -53,6 +53,17 @@ def test_collate_fn(batch):
         new_y_list = F.pad(new_y_list,(128,0),'constant',1)
 
     return new_x_list, new_y_list
+
+def get_last_step(base_path = configuration.path_to_checkpoints):
+    dir = os.listdir(base_path)
+    last_step = 0
+    last_step_name = 'curriculum 0'
+    for file in dir:
+        if 'curriculum' in file and int(file[11:12]) > last_step:
+            last_step = int(file[11:12])
+            last_step_name = file
+    return (last_step,last_step_name)
+
 def convert_csv_to_parquet(path):
     #size = os.path.getsize(path + '.csv')
     #data = dd.read_csv(path +'.csv',header = None,index_col = None).to_parquet(path + '.csv')
@@ -186,48 +197,81 @@ class ModelManager():
             self.prev_results = {}
     
     def save_checkpoint(self,num_focus,net,optimizer,train_loss,val_loss, base_training_params):
-        if configuration.out_size == 128:
-            name = f'{num_focus},delays'
-        else:
-            name = f'{num_focus},delays and amps'
-        if name in self.prev_results and min(val_loss) > self.prev_results[name]:
-            return
-        self.prev_results[name] = min(val_loss)
-        state = {
-            'net' : net.state_dict(),
-            'train loss': train_loss,
-            'val loss': val_loss,
-            'optimizer state': optimizer.state_dict(),
-            'base training params' : base_training_params,
-            'out_size' : configuration.out_size
-        }
-        if configuration.out_size == 128:
-
-            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
-        else:
-            path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
-
-        torch.save(state,path_to_save)
-        with open(configuration.path_to_prev_results, "w") as write_file:
-            json.dump(self.prev_results, write_file)
-
-    def load_checkpoint(self,num_focus):
-        if configuration.out_size == 128:
-            name = f'{num_focus},delays'
-        else:
-            name = f'{num_focus},delays and amps'
-        if name in self.prev_results:
+        if configuration.mode == 'synth':
             if configuration.out_size == 128:
-                path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays jit.pt')
-                if not os.path.isfile(path_to_load):
-                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
+                name = f'{num_focus},delays'
             else:
-                path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays jit.pt')
-                if not os.path.isfile(path_to_load):
-                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
+                name = f'{num_focus},delays and amps'
+            if name in self.prev_results and min(val_loss) > self.prev_results[name]:
+                return
+            self.prev_results[name] = min(val_loss)
+            state = {
+                'net' : net.state_dict(),
+                'train loss': train_loss,
+                'val loss': val_loss,
+                'optimizer state': optimizer.state_dict(),
+                'base training params' : base_training_params,
+                'out_size' : configuration.out_size,
+                'mode' :  configuration.mode
+            }
+            if configuration.out_size == 128:
+
+                path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
+            else:
+                path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
+
+            torch.save(state,path_to_save)
+            with open(configuration.path_to_prev_results, "w") as write_file:
+                json.dump(self.prev_results, write_file)
+        else:
+            step = base_training_params['step num']
+            name = 'curriculum ' + str(step)
+
+            if name in self.prev_results and min(val_loss) > self.prev_results[name]:
+                return
+            self.prev_results[name] = min(val_loss)
+            state = {
+                'net' : net.state_dict(),
+                'train loss': train_loss,
+                'val loss': val_loss,
+                'optimizer state': optimizer.state_dict(),
+                'base training params' : base_training_params,
+                'out_size' : configuration.out_size,
+                'step num' : step,
+                'mode' :  configuration.mode
+            }
+            path_to_save = os.path.join(configuration.path_to_checkpoints,f'{name}.pt')
+            torch.save(state,path_to_save)
+            
+            with open(configuration.path_to_prev_results, "w") as write_file:
+                json.dump(self.prev_results, write_file)
+
+    def load_checkpoint(self,num_focus = 10,step_num = 0):
+        (step,name) = get_last_step()
+        if configuration.mode == 'synth' or step_num == 0:
+            if configuration.out_size == 128:
+                name = f'{num_focus},delays'
+            else:
+                name = f'{num_focus},delays and amps'
+            if name in self.prev_results:
+                if configuration.out_size == 128:
+                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays jit.pt')
+                    if not os.path.isfile(path_to_load):
+                        path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.pt')
+                else:
+                    path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays jit.pt')
+                    if not os.path.isfile(path_to_load):
+                        path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
+                checkpoint = torch.load(path_to_load,map_location = configuration.device)
+                return checkpoint
+        else:
+            step = step_num if step_num != 0 else step
+            name = 'curriculum ' + str(step)
+            path_to_load = os.path.join(configuration.path_to_checkpoints,f'{name}.pt')
             checkpoint = torch.load(path_to_load,map_location = configuration.device)
             return checkpoint
-    
+                
+        
     def convert_model_to_onnx(self,num_focus):
         if configuration.out_size == 128:
             path_to_save = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses only delays.onnx')
@@ -406,7 +450,9 @@ class baseDataSet(Dataset):
         #row = np.asarray(row.values)
         #row = torch.as_tensor(np.asarray(row)).flatten()
         if self.from_singleton or self.from_file:
-            x = convulve_with_sinc(row[:configuration.in_size])
+            x = row[:configuration.in_size]
+            if configuration.mode == 'synth':
+                x = convulve_with_sinc(x)
             x = torch.as_tensor(x)
             y = torch.as_tensor(row[configuration.in_size:])
             if self.droped:
@@ -468,6 +514,17 @@ class datasetManager():
                 path = f'{num_focuses} focus data delays'
             csv_file = os.path.join(configuration.base_path_datasets,path)
             orig = os.path.join(configuration.base_path_datasets,path)
+        elif configuration.mode != 'synth':
+            (step,name) = get_last_step(configuration.base_path_datasets)
+            print(step,name)
+            path = '10 focus data delays'
+            if step != 0:
+                path = name
+            csv_file = os.path.join(configuration.base_path_datasets,path)
+            orig = os.path.join(configuration.base_path_datasets,path)
+            
+                  
+
         self.csv_file = csv_file
         if orig == configuration.path_combined:
             self.mode = 'both'

@@ -21,7 +21,7 @@ import os
 import dask.dataframe as dd
 import dask
 from dask.distributed import Client
-import matlab
+#import matlab
 
 column_types = {str(i):'float64' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
 column_types.update({str(i):'int32' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
@@ -248,6 +248,7 @@ class ModelManager():
 
     def load_checkpoint(self,num_focus = 10,step_num = 0):
         (step,name) = get_last_step()
+        print(step,name,step_num)
         if configuration.mode == 'synth' or step_num == 0:
             if configuration.out_size == 128:
                 name = f'{num_focus},delays'
@@ -263,12 +264,14 @@ class ModelManager():
                     if not os.path.isfile(path_to_load):
                         path_to_load = os.path.join(configuration.path_to_checkpoints,f'net for {num_focus} focuses amps and delays.pt')
                 checkpoint = torch.load(path_to_load,map_location = configuration.device)
+                print(path_to_load)
                 return checkpoint
         else:
             step = step_num if step_num != 0 else step
             name = 'curriculum ' + str(step)
             path_to_load = os.path.join(configuration.path_to_checkpoints,f'{name}.pt')
             checkpoint = torch.load(path_to_load,map_location = configuration.device)
+            print(path_to_load)
             return checkpoint
                 
         

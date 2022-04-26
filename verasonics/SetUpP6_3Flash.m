@@ -150,11 +150,11 @@ delays = delays - min(min(delays));
 
 %delays = delays / (2 * pi);
 delays = delays / ( 2 * pi);
-figure
-subplot(1,2,1)
-plot(delays);
-subplot(1,2,2)
-plot(from_net)
+% figure
+% subplot(1,2,1)
+% plot(delays);
+% subplot(1,2,2)
+% plot(from_net)
 %delays = delays / (Trans.frequency * 1e6);
 %delays = delays /Trans.frequ ency;
 %delays = load('C:\Users\Administrator\Documents\Matlab\Dror\verasonics\delays_example.txt','-ascii');

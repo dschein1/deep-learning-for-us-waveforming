@@ -23,9 +23,9 @@ import dask
 from dask.distributed import Client
 import matlab
 
-column_types = {str(i):'int8' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
-column_types.update({str(i):'int8' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
-column_types_second = {str(i):'float32' for i in range(641,641 + 128)}
+column_types = {str(i):'float64' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
+column_types.update({str(i):'int32' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
+column_types_second = {str(i):'float64' for i in range(641,641 + 128)}
 column_types.update(column_types_second)
 column_names_no_amps = [str(i) for i in range(1,513)].append([str(i) for i in range(641,641 + 128)])
 column_names_with_amps = [str(i) for i in range(1,641 + 128)]

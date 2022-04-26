@@ -16,7 +16,8 @@ patterns(512 + 10) = 1;
 patterns(512 - 10) = 1;
 [amps, delays_gs] = calculateGS(patterns,false);
 loaded = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\curriculum 1.mat');
-delays = double(loaded.from_net(10,:));
+%%
+delays = double(loaded.from_net(50,:));
 %delays = delays_gs;
 amps = ones(1,128);
 %  pattern = generate_patterns(1,1024,6);
@@ -63,6 +64,7 @@ im_from_field = squeeze(create_new_image(delays,amps));
 N = 1024;
 pitch_half = pitch/2;
 x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
+x_full = -(512-1)*pitch/2:pitch:512*pitch/2;
 dz = 0.1e-3;
 z_max = 2*40e-3;
 z = 0:dz:z_max;
@@ -92,13 +94,15 @@ x = linspace(x_min,x_max,200);
 z_field = linspace(z_min,z_max,300);
 dz_field = (80e-3 - 10e-3)/300;
 index = find(z_field == 40e-3);
+line_at_depth = create_new_line(delays,amps);
 figure
 subplot(2,2,1)
 imagesc(x_half * 1e3,z * 1e3,I_FSP1_z0); colormap jet; axis square; axis on; zoom(1); title('from gs full image')
 subplot(2,2,2)
 imagesc(x * 1e3,z_field * 1e3,im_from_field); colormap jet; axis square; axis on; zoom(1); title('from field ii full image')
 subplot(2,2,4)
-plot(x * 1e3,im_from_field(round(40e-3 / dz_field - 10e-3/dz_field),:)); title('from field ii at depth 40 mm')
+plot(x_full * 1e3,line_at_depth); title('from field ii at depth 40 mm')
+%plot(x * 1e3,im_from_field(round(40e-3 / dz_field - 10e-3/dz_field),:)); title('from field ii at depth 40 mm')
 subplot(2,2,3)
 plot(x_half * 1e3,I_FSP1_z0(40e-3/dz,:)); title('from gs at depth 40 mm');
 %%

@@ -25,7 +25,7 @@ function generate_data_from_field_ii()
     full_path = strcat('C:/Users/DrorSchein/Desktop/thesis/thesis/datasets/',file_name,'/base data/');
     %rmdir(full_path)
     mkdir(full_path)
-    chunk_size = 20000;
+    chunk_size = 5000;
     columns = cellstr(string(0:768));
     size(columns);
     num_iterations = ceil (num_samples / chunk_size);
@@ -38,9 +38,8 @@ function generate_data_from_field_ii()
         %size(index)
         amps = ones(actual_size,128);
         %size(amps)
-        results = zeros(num_samples,512);
+        results = zeros(actual_size,512);
         for j=1:actual_size
-            j
             delay = delays(j,:);
             
             delay = delay - min(min(delay));
@@ -52,6 +51,7 @@ function generate_data_from_field_ii()
         %results(i,:) = calculateGS(patterns(i,:));
         %results(i,:) = abs(results(i,:));
         end
+        
         full = [index' results amps delays];
         full = array2table(full);
         full.Properties.VariableNames = columns;

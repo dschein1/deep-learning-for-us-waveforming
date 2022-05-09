@@ -23,12 +23,18 @@ import dask
 from dask.distributed import Client
 #import matlab
 
-column_types = {str(i):'float64' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
-column_types.update({str(i):'int32' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
+column_types_real = {str(i):'float64' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
+column_types_real.update({str(i):'int8' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
 column_types_second = {str(i):'float64' for i in range(641,641 + 128)}
-column_types.update(column_types_second)
+column_types_real.update(column_types_second)
 column_names_no_amps = [str(i) for i in range(1,513)].append([str(i) for i in range(641,641 + 128)])
 column_names_with_amps = [str(i) for i in range(1,641 + 128)]
+column_types_synth = {str(i):'int8' for i in range(1,513)} #pd.SparseDtype(dtype='int8',fill_value=0) for i in range(1,513)}
+column_types_synth.update({str(i):'int8' for i in range(513,513 + 128)}) #pd.SparseDtype(dtype='int8',fill_value=1) for i in range(513,513 + 128)})
+column_types_second = {str(i):'float64' for i in range(641,641 + 128)}
+column_types_synth.update(column_types_second)
+
+column_types = column_types_real
 BASE_FILE_SIZE = 1000
 def split_data(path):
     os.mkdir(path + 'train data/')
@@ -70,9 +76,15 @@ def convert_csv_to_parquet(path):
     if os.path.exists(path + '.parquet'):
         data = dd.read_parquet(path + '.parquet').astype(column_types)
     elif os.path.exists(path + '/base data/'):
-        data = dd.read_parquet(path + '/base data/*.parquet') #.set_index('0').astype(column_types)
-        print(data.columns)
-        data = data.set_index(data.columns[0]).astype(column_types)
+        data = dd.read_parquet(path + '/base data/*.parquet').astype(column_types) #.set_index('0')
+        print(data.columns,data.dtypes,'read data')
+        try:
+            data = data.set_index(data.columns[0]) #.astype(column_types)    
+        except Exception as e: 
+            print(e)
+            data = data.set_index(data.columns[0]) #.astype(column_types)
+        #column_types.pop('0')
+        print('passed index setting')
     else:
         data = dd.read_csv(path +'.csv',dtype =  column_types).set_index('0').astype(column_types)
     print(data.dtypes,data.columns)
@@ -273,7 +285,12 @@ class ModelManager():
             checkpoint = torch.load(path_to_load,map_location = configuration.device)
             print(path_to_load)
             return checkpoint
-                
+    
+    def load_model(self,num_focus,step_num,drop = 0,k = 512, reduce_conv = True,expansion_factor = 3, num_blocks = 9):
+        checkpoint = self.load_checkpoint(num_focus,step_num)
+        net = nets.multiResNet(drop = drop, k = k, reduce_conv = reduce_conv, expansion_factor=expansion_factor,num_blocks=num_blocks)
+        net.load_state_dict(checkpoint['net'], strict= False)
+        return net
         
     def convert_model_to_onnx(self,num_focus):
         if configuration.out_size == 128:
@@ -552,8 +569,8 @@ class datasetManager():
     def create_datasets(self):
         if not os.path.exists(self.orig + '/train.parquet'):
             convert_csv_to_parquet(self.orig)
-        if not os.path.exists(self.orig + '/train data/0.parquet'):
-            split_data(self.orig + '/')
+        #if not os.path.exists(self.orig + '/train data/0.parquet'):
+        #    split_data(self.orig + '/')
         #singleton = dataSingleton.getInstance()
         #singleton.load_data(self.orig)
         #train_dataset = baseDataSet(from_singleton=True,type_of_data='train', from_file=True)

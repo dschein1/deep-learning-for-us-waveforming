@@ -4,7 +4,7 @@ clear data; clear P
 
 % x = -L1/2:d1:L1/2;
 % z = -L2/2:d2:L2/2;
-x = -7.5:0.1:7.5;
+x = -8:0.1:8;
 
 % data=squeeze(data_SAMI4MHz_204060); z = 18:0.25:66;
 % data=squeeze(data_SAMI3MHz_305070); z = 28:0.25:76;

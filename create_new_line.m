@@ -3,7 +3,6 @@ function total_result = create_new_line(delays,	amp)
     delays (1,:)
     amp (1,:) = ones(1,128)
     end
-    init_field
     depth = 40e-3;
     Number_of_cycles=1; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 

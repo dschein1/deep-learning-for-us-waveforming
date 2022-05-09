@@ -1,5 +1,6 @@
 function generate_data_from_field_ii()
     base_path = 'C:/Users/DrorSchein/Desktop/thesis/thesis/';
+    init_field
 
     N = 1024;
     DZ = 40e-3; % Distance to pattern 
@@ -25,23 +26,22 @@ function generate_data_from_field_ii()
     full_path = strcat('C:/Users/DrorSchein/Desktop/thesis/thesis/datasets/',file_name,'/base data/');
     %rmdir(full_path)
     mkdir(full_path)
-    chunk_size = 5000;
+    chunk_size = 2000;
     columns = cellstr(string(0:768));
     size(columns);
     num_iterations = ceil (num_samples / chunk_size);
-    
-    parfor i=0:num_iterations - 1
+    delays = zeros(chunk_size,128);
+    amps = ones(chunk_size,128);
+    results = zeros(chunk_size,512);
+    for i=0:num_iterations - 1
         actual_size = min([chunk_size,num_samples - i *chunk_size]);
-        index = i * chunk_size:i * chunk_size + actual_size - 1;
-        delays = double(data(index + 1,:));
+        index = double(i * chunk_size:i * chunk_size + actual_size - 1);
+        delays(:,:) = double(data(index + 1,:));
         i
         %size(index)
-        amps = ones(actual_size,128);
         %size(amps)
-        results = zeros(actual_size,512);
         for j=1:actual_size
             delay = delays(j,:);
-            
             delay = delay - min(min(delay));
             delay = unwrap(delay);
             delay = delay / (2 * pi);

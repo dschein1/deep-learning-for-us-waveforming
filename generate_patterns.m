@@ -12,19 +12,23 @@ function patterns = generate_patterns(batch_size,N, num_focus)
     Number_of_Elements = 128; % 
     Transducer_size = pitch*Number_of_Elements;
     Diffraction_limit=1.22*Wavelength*DZ/Transducer_size;
-    min_distance = 3 *  Diffraction_limit/pitch; % in units of the vector
-    lower = round(N/2 - 15e-3/pitch);
-    upper = round(N/2 + 15e-3/pitch) - 1;
+    min_distance = 5 *  Diffraction_limit/pitch; % in units of the vector
+    lower = round(N/2 - 16e-3/pitch);
+    upper = round(N/2 + 16e-3/pitch) - 1;
+    possible_indexes_base = 1:(upper - lower);
     for i = 1:batch_size
         points = zeros(1,number_in_each(i)) - 100;
+        line = zeros(1,N);
         j=1;
         while j<=number_in_each(i)
+             
             point = randi([lower,upper]);
             if all(abs(points - point)>min_distance)
                 points(1,j) = point;
                 j = j + 1;
             end
         end
-        patterns(i,points) = 1;
+        line(points) = 1;
+        patterns(i,:) = line;
     end
 end

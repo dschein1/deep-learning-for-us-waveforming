@@ -9,7 +9,7 @@ x = -8:0.1:8;
 % data=squeeze(data_SAMI4MHz_204060); z = 18:0.25:66;
 % data=squeeze(data_SAMI3MHz_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMI4MHz_305070); z = 28:0.25:76;
-data=squeeze(data_to_show); z = 35:0.2:45;
+data=squeeze(data_to_show); z = 35:0.15:45;
 % data=squeeze(data_SAMIinc_305070); z = 28:0.25:76;
 % data=squeeze(data_SAMIdec_305070); z = 28:0.25:76;
 z = flip(z);
@@ -19,7 +19,7 @@ for m=1:size(data,1)
 %              P(m,n)=max(data(m,n).signal)-min(data(m,n).signal);
 %              P(m,n) = P(m,n)/2;
              P(m,n)=min(data(m,n).signal);
-             if abs(P(m,n))>24000
+             if abs(P(m,n))>7800
                  P(m,n)=0;
              end
 %              P(m,n)=max(data(m,n).signal);

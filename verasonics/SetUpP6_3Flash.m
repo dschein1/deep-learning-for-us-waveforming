@@ -117,7 +117,7 @@ Resource.DisplayWindow.Colormap = gray(256);
 
 % 3.2.1 Specify Transmit waveform structure.
 TW.type = 'parametric';
-TW.Parameters = [Trans.frequency,.67,10,1];   % A, B, C, D
+TW.Parameters = [Trans.frequency,.67,2,1];   % A, B, C, D
 %%%%%%%%% Arbitrary waveform with TW.PulseCode or envelope %%%%%%%%%%%%
 
 % % 3.2.2 Set up transmit delays in TX structure.
@@ -133,23 +133,27 @@ Fill_Factor = 1;
 width = Pitch*Fill_Factor;
 folder = 'C:\Users\Administrator\Documents\MATLAB\Dror\'; 
 addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
-loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data05 focus from net.mat');
-from_net = double(loaded.from_net(1,:));
+loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data0 5 focus from net.mat');
+from_net = double(loaded.from_net_base(1,:));
 from_net = unwrap(from_net);
 from_net = from_net - min(min(from_net));
 from_net = from_net / (2 * pi);
 %from_gs = loaded.from_gs(1,:);
 patterns = zeros(1,1024);
-patterns(512 - 5) = 1;
-patterns(512 + 5) = 1;
-[amps, delays] = calculateGS(patterns,false);
+i = -2:2;
+patterns(512 - 8 * i) = 1;
+%patterns(512 + 5) = 1;
+[amps, delays_gs] = calculateGS(patterns,false);
 %delays = from_net;
 
-delays = unwrap(delays);
-delays = delays - min(min(delays));
+pattern = double(loaded.source(1,:));
+patterns = padarray(pattern,[0 256],0,'both');
+[amps, delays_gs] = calculateGS(patterns,false);
+delays_gs = unwrap(delays_gs);
+delays_gs = delays_gs - min(min(delays_gs));
 
 %delays = delays / (2 * pi);
-delays = delays / ( 2 * pi);
+delays_gs = delays_gs / ( 2 * pi);
 % figure
 % subplot(1,2,1)
 % plot(delays);
@@ -283,14 +287,14 @@ UI(2).Callback = text2cell('%RangeChangeCallback');
 
 % Specify factor for converting sequenceRate to frameRate.
 frameRateFactor = 3;
-TPC.hv = 4.0;
+%TPC.hv = 1.6;
 % Save all the structures to a .mat file.
 save('MatFiles\test-from-net');
 filename = 'test-from-net';
 VSX
 return
 
-
+f
 % **** Callback routines to be converted by text2cell function. ****
 %SensCutoffCallback - Sensitivity cutoff change
 ReconL = evalin('base', 'Recon');

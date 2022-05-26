@@ -12,21 +12,32 @@ function patterns = generate_patterns(batch_size,N, num_focus)
     Number_of_Elements = 128; % 
     Transducer_size = pitch*Number_of_Elements;
     Diffraction_limit=1.22*Wavelength*DZ/Transducer_size;
-    min_distance = 5 *  Diffraction_limit/pitch; % in units of the vector
+    min_distance = round(4.5 *  Diffraction_limit/pitch); % in units of the vector
     lower = round(N/2 - 16e-3/pitch);
     upper = round(N/2 + 16e-3/pitch) - 1;
-    possible_indexes_base = 1:(upper - lower);
-    for i = 1:batch_size
+    possible_indexes_base = lower:upper;
+    parfor i = 1:batch_size
         points = zeros(1,number_in_each(i)) - 100;
         line = zeros(1,N);
+        possible_indexes = possible_indexes_base;
         j=1;
         while j<=number_in_each(i)
-             
-            point = randi([lower,upper]);
-            if all(abs(points - point)>min_distance)
-                points(1,j) = point;
-                j = j + 1;
+            mask = possible_indexes ~= -1;
+            actual_indexes = possible_indexes(mask);
+            if length(actual_indexes) == 0
+                break
             end
+            point_index = randi(length(actual_indexes));
+            %point = randi([lower,upper]);
+            point = actual_indexes(point_index);
+            index_in_real = find(possible_indexes == point,1);
+            possible_indexes(max(index_in_real - min_distance,1):min(index_in_real + min_distance,length(possible_indexes))) = -1;
+            points(1,j) = point;
+%             if all(abs(points - point)>min_distance)
+%                 points(1,j) = point;
+%                 j = j + 1;
+%             end
+            j = j+1;
         end
         line(points) = 1;
         patterns(i,:) = line;

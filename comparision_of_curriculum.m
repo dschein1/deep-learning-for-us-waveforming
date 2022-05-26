@@ -49,7 +49,7 @@ findpeaks(line_base,x_full,'MinPeakProminence',0.05,MinPeakHeight=0.2);
 [pks,locs,widths_base,proms] = findpeaks(line_base,x_full,'MinPeakProminence',0.3); title('peaks from net base')
 widths_base
 subplot(1,2,2)
-findpeaks(line_1,x_full,'MinPeakProminence',0.05,MinPeakHeight=0.2)
+findpeaks(line_1,x_full,'MinPeakProminence',0.05,MinPeakHeight=0.3)
 [pks,locs,widths_1,proms] = findpeaks(line_1,x_full,'MinPeakProminence',0.3); title('peaks from net step 1')
 widths_1
 

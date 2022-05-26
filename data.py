@@ -19,6 +19,7 @@ import nets
 import json 
 import os
 import dask.dataframe as dd
+from scipy.signal import find_peaks
 import dask
 from dask.distributed import Client
 #import matlab
@@ -62,8 +63,8 @@ def test_collate_fn(batch):
 
 def get_last_step(base_path = configuration.path_to_checkpoints):
     dir = os.listdir(base_path)
-    last_step = 0
-    last_step_name = 'curriculum 0'
+    last_step = -1
+    last_step_name = 'curriculum -1'
     for file in dir:
         if 'curriculum' in file and int(file[11:12]) > last_step:
             last_step = int(file[11:12])
@@ -73,21 +74,27 @@ def get_last_step(base_path = configuration.path_to_checkpoints):
 def convert_csv_to_parquet(path):
     #size = os.path.getsize(path + '.csv')
     #data = dd.read_csv(path +'.csv',header = None,index_col = None).to_parquet(path + '.csv')
+    if 'curriculum' in path or configuration.mode == 'real':
+        column_types = column_types_real
+    else:
+        column_types = column_types_synth
+    column_types.update({'0':'int32'})
     if os.path.exists(path + '.parquet'):
         data = dd.read_parquet(path + '.parquet').astype(column_types)
     elif os.path.exists(path + '/base data/'):
         data = dd.read_parquet(path + '/base data/*.parquet').astype(column_types) #.set_index('0')
+        print(column_types)
         print(data.columns,data.dtypes,'read data')
         try:
             data = data.set_index(data.columns[0]) #.astype(column_types)    
         except Exception as e: 
             print(e)
             data = data.set_index(data.columns[0]) #.astype(column_types)
-        #column_types.pop('0')
+        column_types.pop('0')
         print('passed index setting')
     else:
         data = dd.read_csv(path +'.csv',dtype =  column_types).set_index('0').astype(column_types)
-    print(data.dtypes,data.columns)
+    print(data.dtypes,data.index)
     n = len(data)
     perm = np.random.permutation(n)
     train_idx = np.sort(perm[:round(0.75*n)])
@@ -187,17 +194,21 @@ def create_patterns_1d(amount,N,seq_length = 50):
             #      to_apply = sinc
             #patterns[i,lower:upper] += to_apply
     return torch.from_numpy(patterns)
+def extract_peaks(input):
+    pass
 
 def convulve_with_sinc(input):
     pitch = configuration.pitch
     x_aranged = np.arange(-256 * pitch ,256 * pitch,pitch)
-    sinc = np.abs(np.sinc(1045.61 * x_aranged)) ** 2
+    #sinc = np.abs(np.sinc(1045.61 * x_aranged)) ** 2
+    sinc = np.abs(np.sinc(1045.61 * x_aranged))
     sinc[:256 - 50] = 0
     sinc[256 + 50:] = 0
     if input.ndim == 2:
         x_conv = np.apply_along_axis(np.convolve,1,input,sinc,mode = 'same')
     else:
         x_conv = np.convolve(input,sinc,mode = 'same')
+    x_conv = np.abs(x_conv)
     return x_conv
 
 class ModelManager():
@@ -261,7 +272,7 @@ class ModelManager():
     def load_checkpoint(self,num_focus = 10,step_num = 0):
         (step,name) = get_last_step()
         print(step,name,step_num)
-        if configuration.mode == 'synth' or step_num == 0:
+        if configuration.mode == 'synth' or step_num == -1:
             if configuration.out_size == 128:
                 name = f'{num_focus},delays'
             else:
@@ -279,7 +290,7 @@ class ModelManager():
                 print(path_to_load)
                 return checkpoint
         else:
-            step = step_num if step_num != 0 else step
+            step = step_num if step_num != -1 else step
             name = 'curriculum ' + str(step)
             path_to_load = os.path.join(configuration.path_to_checkpoints,f'{name}.pt')
             checkpoint = torch.load(path_to_load,map_location = configuration.device)
@@ -473,6 +484,14 @@ class baseDataSet(Dataset):
             x = row[:configuration.in_size]
             if configuration.mode == 'synth':
                 x = convulve_with_sinc(x)
+                #pass
+            else:
+                pass
+                peaks,info = find_peaks(x,height=0.5,prominence=0.05)
+                #print(x.dtype,np.zeros(x.shape).shape,info['peak_heights'],peaks,info)
+                base = np.zeros(x.shape)
+                x = base[peaks] = info['peak_heights']
+                x = convulve_with_sinc(x)
             x = torch.as_tensor(x)
             y = torch.as_tensor(row[configuration.in_size:])
             if self.droped:
@@ -538,7 +557,7 @@ class datasetManager():
             (step,name) = get_last_step(configuration.base_path_datasets)
             print(step,name)
             path = '10 focus data delays'
-            if step != 0:
+            if step != -1:
                 path = name
             csv_file = os.path.join(configuration.base_path_datasets,path)
             orig = os.path.join(configuration.base_path_datasets,path)

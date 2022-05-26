@@ -1,6 +1,6 @@
 function generate_data(num_samples,vec_size,num_focus,allows_amps)
     batch_size = num_samples;
-    
+    init_field
     N = vec_size;
     DZ = 40e-3; % Distance to pattern 
     Frequancy = 4.464e6; 
@@ -21,7 +21,7 @@ function generate_data(num_samples,vec_size,num_focus,allows_amps)
     size(columns);
     num_iterations = ceil (num_samples / chunk_size)
     
-    for i=289:num_iterations - 1
+    for i=0 %:num_iterations - 1
         actual_size = min([chunk_size,num_samples - i *chunk_size]);
         index = i * chunk_size:i * chunk_size + actual_size - 1;
         %size(index)

@@ -117,7 +117,7 @@ Resource.DisplayWindow.Colormap = gray(256);
 
 % 3.2.1 Specify Transmit waveform structure.
 TW.type = 'parametric';
-TW.Parameters = [Trans.frequency,.67,2,1];   % A, B, C, D
+TW.Parameters = [Trans.frequency,.67,10,1];   % A, B, C, D
 %%%%%%%%% Arbitrary waveform with TW.PulseCode or envelope %%%%%%%%%%%%
 
 % % 3.2.2 Set up transmit delays in TX structure.
@@ -133,7 +133,7 @@ Fill_Factor = 1;
 width = Pitch*Fill_Factor;
 folder = 'C:\Users\Administrator\Documents\MATLAB\Dror\'; 
 addpath('C:\Users\Administrator\Documents\MATLAB\Dror');
-loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data.mat');
+loaded = load('C:\Users\Administrator\Documents\MATLAB\Dror\py to matlab\single_data05 focus from net.mat');
 from_net = double(loaded.from_net(1,:));
 from_net = unwrap(from_net);
 from_net = from_net - min(min(from_net));
@@ -283,7 +283,7 @@ UI(2).Callback = text2cell('%RangeChangeCallback');
 
 % Specify factor for converting sequenceRate to frameRate.
 frameRateFactor = 3;
-
+TPC.hv = 4.0;
 % Save all the structures to a .mat file.
 save('MatFiles\test-from-net');
 filename = 'test-from-net';

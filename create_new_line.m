@@ -1,10 +1,11 @@
-function total_result = create_new_line(delays,	amp)
+function total_result = create_new_line(delays,	amp,num_cycles)
     arguments
     delays (1,:)
     amp (1,:) = ones(1,128)
+    num_cycles = 1
     end
     depth = 40e-3;
-    Number_of_cycles=1; % Number of transmitted cycles. 1 for a single pulse
+    Number_of_cycles=num_cycles; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 
     c = 1490; % water in room temperature m/sec (in body  v = 1540)
     pitch = 0.218e-3; % 
@@ -33,9 +34,9 @@ function total_result = create_new_line(delays,	amp)
     %%generating the actual line
     for i=1:size(delays,1)
         xdc_focus_times(Th,0,delays(i,:));
-        x_min = -(256 - 1) * pitch;
-        x_max = 256 * pitch;
-        x = x_min:pitch:x_max;
+        x_min = -(256 - 1) * pitch/5;
+        x_max = 256 * pitch/5;
+        x = x_min:pitch/5:x_max;
         points = zeros(512,3);
         points(:,1) = x';
         points(:,3) = depth;

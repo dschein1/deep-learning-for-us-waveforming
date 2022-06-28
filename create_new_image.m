@@ -1,9 +1,10 @@
-function total_result = create_new_image(delays,amp)
+function total_result = create_new_image(delays,amp,num_cycles)
     arguments
     delays (1,:)
     amp (1,:) = ones(1,128)
+    num_cycles = 1
     end
-    Number_of_cycles=1; % Number of transmitted cycles. 1 for a single pulse
+    Number_of_cycles=num_cycles; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 
     c = 1490; % water in room temperature m/sec (in body  v = 1540)
     pitch = 0.218e-3; % 
@@ -28,10 +29,10 @@ function total_result = create_new_image(delays,amp)
     excitation = sin(2*pi*f0*te+pi); % Excitation signal
     xdc_excitation(Th, excitation);
     xdc_apodization(Th, 0, Apo');
-    x_min = -30e-3;
-    x_max = 30e-3;
+    x_min = -15-3;
+    x_max = 15e-3;
     z_min = 10e-3;
-    z_max = 80e-3;
+    z_max = 70e-3;
     x = linspace(x_min,x_max,200);
     z = linspace(z_min,z_max,300);
     total_result = zeros(size(delays,1),300,200);

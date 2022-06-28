@@ -377,7 +377,7 @@ x_max = 256 * pitch/5;
 x_full = x_min:pitch/5:x_max;
 peak_thresh = 0.5;
 for num_focus=2:10
-    separation=2;
+    separation=4;
     gs_found = false;
     gs_multi_found = false;
     model_found = false;
@@ -386,12 +386,10 @@ for num_focus=2:10
         temp = source(num_focus - 1,separation - 1,:);
         temp = reshape(temp,1,512);
         base = padarray(temp,[0 256],0,'both');
-
         [amps, delays_gs] = calculateGS(base,false);
-        delays_gs = normalize_delays(delays_gs);
         if ~gs_found
             line = create_new_line(delays_gs);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
+            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_height);
             if length(pks) == num_focus
                 gs_found = true;
                 effective_thresh(1,num_focus - 1) = separation;
@@ -399,17 +397,17 @@ for num_focus=2:10
         end
         if ~gs_multi_found
             line = create_new_line(delays_gs,amps,10);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
+            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_height);
             if length(pks) == num_focus
                 gs_multi_found = true;
                 effective_thresh(2,num_focus - 1) = separation;
             end
         end
         if ~model_found
-            delays = double(delays_step_1(num_focus - 1,separation - 1,:));
+            delays = double(delays_step_1(num_focus - 1,spacing - 1,:));
             delays = normalize_delays(delays);
             line = create_new_line(delays);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
+            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_height);
             if length(pks) == num_focus
                 model_found = true;
                 effective_thresh(3,num_focus - 1) = separation;
@@ -417,5 +415,5 @@ for num_focus=2:10
         end
         separation = separation + 1;
     end
+    num_focus = num_focus + 1;
 end
-plot(effective_thresh)

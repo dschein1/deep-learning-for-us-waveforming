@@ -398,12 +398,14 @@ class dataSingleton():
 
 class baseDataSet(Dataset):
     def __init__(self,indexes = None,source_data = None,seq_length = 50 ,file_path = "C:/Users/drors/Desktop/code for thesis/data.csv",transforms = None, mode = 'both',
-                    from_file = False, from_singleton = False,type_of_data = 'train', lazy = False):
+                    from_file = False, from_singleton = False,type_of_data = 'train', lazy = False,return_both = False,return_integers = False):
 
         #self.data = pd.read_csv(csv_file,header = None, index_col = 0,skiprows = )
         self.from_file = from_file
+        self.return_integers = return_integers
         self.from_singleton = False
         self.lazy = lazy
+        self.return_both = return_both
         if not from_file:
             self.data = source_data.loc[indexes,:].compute()
         elif from_singleton:
@@ -483,15 +485,19 @@ class baseDataSet(Dataset):
         if self.from_singleton or self.from_file:
             x = row[:configuration.in_size]
             if configuration.mode == 'synth':
+                base = x
                 x = convulve_with_sinc(x)
                 #pass
             else:
                 pass
-                peaks,info = find_peaks(x,height=0.5,prominence=0.05)
+                peaks,info = find_peaks(x,height=0.5)
                 #print(x.dtype,np.zeros(x.shape).shape,info['peak_heights'],peaks,info)
                 base = np.zeros(x.shape)
-                x = base[peaks] = info['peak_heights']
-                x = convulve_with_sinc(x)
+                if self.return_integers:
+                    base[peaks] = 1
+                else:
+                    base[peaks] = info['peak_heights']
+                x = convulve_with_sinc(base)
             x = torch.as_tensor(x)
             y = torch.as_tensor(row[configuration.in_size:])
             if self.droped:
@@ -512,6 +518,8 @@ class baseDataSet(Dataset):
         # if self.transform_x:
         #     x = self.transform_x.transform(x.reshape(1,-1)).reshape(-1)
         #     y = self.transform_y.transform(y.reshape(1,-1)).reshape(-1)
+        if self.return_both == True:
+            return x,y,base
         return x,y
 
 

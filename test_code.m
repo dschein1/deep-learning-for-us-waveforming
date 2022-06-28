@@ -18,15 +18,17 @@ patterns(512 - 12) = 1;
 
 [amps, delays_gs] =  calculateGS(patterns,false);
 i = 1;
-loaded = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\single_data0 5 focus from net.mat');
+loaded = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\single_data1 5 focus from net.mat');
 pattern = loaded.source(i,:);
 patterns = padarray(pattern,[0 256],0,'both');
 [amps, delays_gs] = calculateGS(patterns,false);
 [amps_gs, delays_gs_amps] = calculateGS(patterns,true);
 delays_gs_amps = normalize_delays(delays_gs_amps);
 delays = double(loaded.from_net_base(i,:));
-delays_0 = double(loaded.from_net_step_1(i,:));
+delays_0 = double(loaded.from_net_step_0(i,:));
 delays_0 = normalize_delays(delays_0);
+delays_1 = double(loaded.from_net_step_1(i,:));
+delays_1 = normalize_delays(delays_1);
 %delays = delays_gs;
 amps = ones(1,128);
 %  pattern = generate_patterns(1,1024,6);
@@ -60,6 +62,9 @@ delays = delays / Frequancy;
 
 im_from_calculated = squeeze(create_new_image(delays_gs));
 im_from_field = squeeze(create_new_image(delays,amps));
+im_from_net_0 = squeeze(create_new_image(delays_0));
+im_from_net_1 = squeeze(create_new_image(delays_1));
+im_from_gs_multi_cycle = squeeze(create_new_image(delays_gs,amps,10));
 % figure
 % subplot(2,2,1)
 % imagesc(x * 1e3,z_field * 1e3,im_from_calculated); colormap jet; axis square; axis on; zoom(1); title('from field ii based on calculation')
@@ -95,42 +100,83 @@ for z0 = z
 end
 I_FSP1_z0 = abs(E_FSP1_z0).^2;
 
-x_min = -30e-3;
-x_max = 30e-3;
+x_min = -15-3;
+x_max = 15e-3;
 z_min = 10e-3;
-z_max = 80e-3;
+z_max = 70e-3;
 x = linspace(x_min,x_max,200);
 z_field = linspace(z_min,z_max,300);
 dz_field = (80e-3 - 10e-3)/300;
 index = find(z_field == 40e-3);
 line_at_depth_base = create_new_line(delays,amps);
 line_at_depth_0 = create_new_line(delays_0,amps);
+line_at_depth_1= create_new_line(delays_1,amps);
 line_at_depth_gs = create_new_line(delays_gs,amps);
 line_at_depth_gs_amps = create_new_line(delays_gs_amps,amps_gs);
-x_for_plot = x_full(:,256 - 100:256 + 100);
-line_at_depth_base = line_at_depth_base(:,256 - 100:256 + 100);
-line_at_depth_0 = line_at_depth_0(:,256 - 100:256 + 100);
-line_at_depth_gs = line_at_depth_gs(:,256 - 100:256 + 100);
-line_at_depth_gs_amps = line_at_depth_gs_amps(:,256 - 100:256 + 100);
-source = loaded.source(i,256 - 100:256 + 100);
+line_at_depth_gs_multi_cycle = create_new_line(delays_gs,amps,10);
+x_min = -(256 - 1) * pitch/5;
+x_max = 256 * pitch/5;
+x_for_plot = x_min:pitch/5:x_max;
+%x_for_plot = x_full(:,256 - 45:256 + 45);
+line_at_depth_base = line_at_depth_base(:,256 - 255:256 + 256);
+line_at_depth_0 = line_at_depth_0(:,256 - 255:256 + 256);
+line_at_depth_1 = line_at_depth_1(:,256 - 255:256 + 256);
+line_at_depth_gs = line_at_depth_gs(:,256 - 255:256 + 256);
+line_at_depth_gs_amps = line_at_depth_gs_amps(:,256 - 255:256 + 256);
+line_at_depth_gs_multi_cycle = line_at_depth_gs_multi_cycle(:,256 - 255:256 + 256);
+source = loaded.source(i,256 - 255:256 + 256);
 %shift = find(line_at_depth == 1) - find( line_at_depth_gs == 1);
 %line_at_depth = circshift(line_at_depth,-1);
+%%
+figure
+grid on
+subplot(2,4,1)
+imagesc(x * 1e3,z_field * 1e3,im_from_gs_multi_cycle); colormap jet; axis square; axis on; zoom(1); title('from gs multi cycle', 'FontSize',16)
+subplot(2,4,5)
+plot(x_for_plot * 1e3,line_at_depth_gs_multi_cycle,'LineWidth',1); title('from gs multi cycle at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,4,2)
+imagesc(x * 1e3,z_field * 1e3,im_from_calculated); colormap jet; axis square; axis on; zoom(1); title('from gs single cycle', 'FontSize',16)
+subplot(2,4,6)
+plot(x_for_plot * 1e3,line_at_depth_gs,'LineWidth',1); title('from gs single cycle at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,4,3)
+imagesc(x * 1e3,z_field * 1e3,im_from_net_0); colormap jet; axis square; axis on; zoom(1); title('from model fine-tuned on integers', 'FontSize',16)
+subplot(2,4,7)
+plot(x_for_plot * 1e3,line_at_depth_0,'LineWidth',1); title('from model fine-tuned on integers at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,4,4)
+imagesc(x * 1e3,z_field * 1e3,im_from_net_1); colormap jet; axis square; axis on; zoom(1); title('from model fine-tuned on floats', 'FontSize',16)
+subplot(2,4,8)
+plot(x_for_plot * 1e3,line_at_depth_1,'LineWidth',1); title('from model fine-tuned on floats at depth 40 mm','FontSize',16); zoom(1);
+% subplot(2,3,1)
+% plot(x_for_plot,source); title('base pattern');
+figure
+subplot(2,3,1)
+set(gca,'FontSize',20)
+
+plot(x_for_plot * 1e3,line_at_depth_base,'LineWidth',1); title('from net learned on gs at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,3,2)
+plot(x_for_plot * 1e3,line_at_depth_0,'LineWidth',1); title('from net learned on field ii integers at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,3,3)
+plot(x_for_plot * 1e3,line_at_depth_1,'LineWidth',1); title('from net learned on field ii at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,3,4)
+plot(x_for_plot * 1e3,line_at_depth_gs,'LineWidth',1); title('from gs no amps at depth 40 mm','FontSize',16); zoom(1);
+subplot(2,3,5)
+plot(x_for_plot * 1e3,line_at_depth_gs_amps,'LineWidth',1); title('from gs with amps at depth 40 mm','FontSize',16); zoom(1);
+
+figure
+title('from net learned on field ii integers at depth 40 mm','FontSize',16)
+plot(x_for_plot * 1e3,line_at_depth_0,DisplayName='model trained on integars');
+hold on
+plot(x_for_plot * 1e3,line_at_depth_1,DisplayName='model trained on varying focuses');
+hold on
+plot(x_for_plot * 1e3,line_at_depth_gs,DisplayName='Gershberg-Saxton');
+hold on
+legend
+%%
 figure
 subplot(1,5,1)
-plot(x_for_plot,source); title('base pattern');
-subplot(1,5,2)
-plot(x_for_plot * 1e3,line_at_depth_base); title('from net learned on gs at depth 40 mm')
-subplot(1,5,3)
-plot(x_for_plot * 1e3,line_at_depth_0); title('from net learned on field ii at depth 40 mm')
-subplot(1,5,4)
-plot(x_for_plot * 1e3,line_at_depth_gs); title('from gs no amps at depth 40 mm')
-subplot(1,5,5)
-plot(x_for_plot * 1e3,line_at_depth_gs_amps); title('from gs with amps at depth 40 mm')
-figure
-subplot(1,3,1)
-findpeaks(line_at_depth_base,x_for_plot * 1e3,'MinPeakProminence',0.01,'Annotate','extents',MinPeakHeight=0.8); title('from base network')
+findpeaks(line_at_depth_gs,x_for_plot * 1e3,'Annotate','extents',MinPeakHeight=0.5); title('from gs threshold 0.5')
 subplot(1,3,2)
-findpeaks(line_at_depth_0,x_for_plot * 1e3,'MinPeakProminence',0.01,'Annotate','extents',MinPeakHeight=0.8); title('from step 1')
+findpeaks(line_at_depth_0,x_for_plot * 1e3,'Annotate','extents',MinPeakHeight=0.5); title('from step 1')
 subplot(1,3,3)
 findpeaks(line_at_depth_base,x_for_plot * 1e3,'MinPeakProminence',0.01,MinPeakHeight=0.8);
 hold on
@@ -141,6 +187,7 @@ widths
 widths_step_1
 widths - widths_step_1
 mean(widths - widths_step_1)
+
 % figure
 % subplot(1,2,1)
 

@@ -130,9 +130,10 @@ stds = std(total_results,0,2);
 y = means;
 error_bar = stds;
 figure
-h = bar(y); ylabel('Success rate %'); xlabel('Number of focuses')
+h = bar(x,y); ylabel('Success rate %');
 %set(h, {'DisplayName'}, {'Output from Gershberg-Saxton' 'Output from model' 'Output from Gershberg-Saxton with multi-cycle'})
-legend('GS' 'Model Single Phase' 'Model Double Phase')
+legend('GS' 'Model Single Phase' 'Model Double Phase'},'FontSize',14,'FontName','roman')
+
 hold on
 % Calculate the number of groups and number of bars in each group
 [ngroups,nbars] = size(y)
@@ -150,13 +151,7 @@ end
 set(gca,'YLim',[0 1.2])
 % Plot the errorbars
 errorbar(x_new',y,error_bar,'k','linestyle','none','HandleVisibility','off');
-% 
-grid on
-set(gca,'xTick',[-5:2.5:+5])
-set(gca,'YTick',[-dB:+dB/2:0])
-set(gca,'xTickLabel',[])
-set(gca,'YTickLabel',[])
-hgexport(gcf, ['Sim_PSF_Lateral',num2str(dB),'dB.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+
 %%
 success_gs_total = [];
 success_gs_multi_total = [];

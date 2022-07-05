@@ -1,8 +1,11 @@
 function patterns = generate_patterns(batch_size,N, num_focus)
     patterns = zeros(batch_size,N);
-    number_in_each = randi(2 ^ (num_focus - 1),batch_size,1);
-    number_in_each = floor(log2(number_in_each)) + 1;
-    %number_in_each = ones(batch_size,1);
+    number_in_each = 2 * randn(batch_size,1) + 5;
+    %number_in_each = randi(2 ^ (num_focus - 1),batch_size,1);
+    %number_in_each = floor(log2(number_in_each)) + 1;
+    number_in_each = floor(number_in_each) + 1;
+    number_in_each(number_in_each > 10) = 10;
+    number_in_each(number_in_each < 1) = 1;
     Frequancy = 4.464e6; 
     v = 1490; % water in room temperature m/sec (in body  v = 1540)
     Wavelength = v/Frequancy;
@@ -25,6 +28,7 @@ function patterns = generate_patterns(batch_size,N, num_focus)
             mask = possible_indexes ~= -1;
             actual_indexes = possible_indexes(mask);
             if length(actual_indexes) == 0
+                points = points(points ~= -100);
                 break
             end
             point_index = randi(length(actual_indexes));

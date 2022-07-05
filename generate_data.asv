@@ -21,9 +21,8 @@ function generate_data(num_samples,vec_size,num_focus,allows_amps)
     size(columns);
     num_iterations = ceil (num_samples / chunk_size)
     
-    parfor i=0:num_iterations - 1
-        init_field
-        actual_size = min([chunk_size,num_samples - i *chunk_size])
+    for i=0 %:num_iterations - 1
+        actual_size = min([chunk_size,num_samples - i *chunk_size]);
         index = i * chunk_size:i * chunk_size + actual_size - 1;
         %size(index)
         amps = zeros(actual_size,128);

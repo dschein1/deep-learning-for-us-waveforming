@@ -34,9 +34,9 @@ function total_result = create_new_line(delays,	amp,num_cycles)
     %%generating the actual line
     for i=1:size(delays,1)
         xdc_focus_times(Th,0,delays(i,:));
-        x_min = -(256 - 1) * pitch/5;
-        x_max = 256 * pitch/5;
-        x = x_min:pitch/5:x_max;
+        x_min = -(256 - 1) * pitch;
+        x_max = 256 * pitch;
+        x = x_min:pitch:x_max;
         points = zeros(512,3);
         points(:,1) = x';
         points(:,3) = depth;

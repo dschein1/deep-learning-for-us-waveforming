@@ -1,9 +1,11 @@
-function total_result = create_new_line(delays,	amp,num_cycles)
+function total_result = create_new_line(delays,	amp,num_cycles,spacing_factor)
     arguments
     delays (1,:)
     amp (1,:) = ones(1,128)
     num_cycles = 1
+    spacing_factor = 3
     end
+    init_field
     depth = 40e-3;
     Number_of_cycles=num_cycles; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 
@@ -34,9 +36,9 @@ function total_result = create_new_line(delays,	amp,num_cycles)
     %%generating the actual line
     for i=1:size(delays,1)
         xdc_focus_times(Th,0,delays(i,:));
-        x_min = -(256 - 1) * pitch;
-        x_max = 256 * pitch;
-        x = x_min:pitch:x_max;
+        x_min = -(256 - 1) * pitch/spacing_factor;
+        x_max = 256 * pitch/spacing_factor;
+        x = x_min:pitch/spacing_factor:x_max;
         points = zeros(512,3);
         points(:,1) = x';
         points(:,3) = depth;

@@ -82,7 +82,6 @@ def convert_csv_to_parquet(path):
         data = dd.read_parquet(path + '.parquet').astype(column_types)
     elif os.path.exists(path + '/base data/'):
         data = dd.read_parquet(path + '/base data/*.parquet').astype(column_types) #.set_index('0')
-        print(column_types)
         print(data.columns,data.dtypes,'read data')
         try:
             data = data.set_index(data.columns[0]) #.astype(column_types)    

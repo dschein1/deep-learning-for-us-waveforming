@@ -9,18 +9,18 @@ v = 1490; % water in room temperature m/sec (in body  v = 1540)
 Wavelength = v/Frequancy;
 patterns = zeros(1,1024);
 %patterns(490) = 1;
-%patterns(500) = 1;
-patterns(512 - 6) = 1;
-patterns(512 + 6) = 1;
+% %patterns(500) = 1;
+% patterns(512 - 6) = 1;
+% patterns(512 + 6) = 1;
 patterns(512) = 1;
-patterns(512 + 12) = 1;
-patterns(512 - 12) = 1;
+% patterns(512 + 12) = 1;
+% patterns(512 - 12) = 1;
 
 [amps, delays_gs] =  calculateGS(patterns,false);
 i = 1;
 loaded = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\single_data1 5 focus from net.mat');
 pattern = loaded.source(i,:);
-patterns = padarray(pattern,[0 256],0,'both');
+%patterns = padarray(pattern,[0 256],0,'both');
 [amps, delays_gs] = calculateGS(patterns,false);
 [amps_gs, delays_gs_amps] = calculateGS(patterns,true);
 delays_gs_amps = normalize_delays(delays_gs_amps);
@@ -88,8 +88,7 @@ new_transducer = imresize(new_transducer,2,'box');
 
 new_transducer = new_transducer(1,1:N);
 
-
-index = 1
+index = 1;
 for z0 = z
 %     [E_FSP1_z0(index,:)] = FSP_X_near(Transducer,z0,N,pitch,Wavelength);
     %[E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
@@ -100,10 +99,10 @@ for z0 = z
 end
 I_FSP1_z0 = abs(E_FSP1_z0).^2;
 
-x_min = -15-3;
-x_max = 15e-3;
-z_min = 10e-3;
-z_max = 70e-3;
+x_min = -10e-3;
+x_max = 10e-3;
+z_min = 30e-3;
+z_max = 50e-3;
 x = linspace(x_min,x_max,200);
 z_field = linspace(z_min,z_max,300);
 dz_field = (80e-3 - 10e-3)/300;
@@ -127,7 +126,7 @@ line_at_depth_gs_multi_cycle = line_at_depth_gs_multi_cycle(:,256 - 255:256 + 25
 source = loaded.source(i,256 - 255:256 + 256);
 %shift = find(line_at_depth == 1) - find( line_at_depth_gs == 1);
 %line_at_depth = circshift(line_at_depth,-1);
-%%
+
 figure
 grid on
 subplot(2,4,1)
@@ -295,6 +294,61 @@ hold on
 plot(base_padded(ii,:))
 
 %%
+init_field
+pattern = zeros(1,1024);
+pattern(512 - 30) = 0;
+pattern(512 - 15) = 1;
+pattern(512 - 0) = 1;
+pattern(512 + 15) = 1;
+pattern(512 + 40) = 0;
+
+[amps,delays] = calculateGS(pattern,true);
+pitch = 0.218e-3;
+Frequancy = 4.464e6; 
+v = 1490; % water in room temperature m/sec (in body  v = 1540)
+Wavelength = v/Frequancy;
+patterns = zeros(1,1024);
+new_transducer = amps .* exp(1i * delays);
+delays = normalize_delays(delays);
+im_gs = squeeze(create_new_image(delays,amps));
+N = 1024;
+pitch_half = pitch/2;
+x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
+x_full = -(512-1)*pitch/2:pitch:512*pitch/2;
+dz = 0.1e-3;
+z_max = 2*40e-3;
+z = 0:dz:z_max;
+new_transducer = padarray(new_transducer,[0 ((1024 - 128) / 2)]);
+new_transducer = new_transducer(1,256:768 -1);
+new_transducer = imresize(new_transducer,2,'box');
+
+new_transducer = new_transducer(1,1:N);
+
+index = 1;
+for z0 = z
+    [E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+    index = index + 1;
+    z0/z_max;
+end
+I_FSP1_z0 = abs(E_FSP1_z0).^2;
+
+I_FSP1_z0 = I_FSP1_z0(400 - 250:400 + 250,512 - 150:512 + 150);
+delays = normalize_delays(delays);
+%im = squeeze(create_new_image(delays));
+figure
+plot(delays,'LineWidth',2);
+set(gca,'XTick',[], 'YTick', [])
+hgexport(gcf, ['results/plot_3_figure_1.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+figure
+imagesc(I_FSP1_z0); colormap hot; axis square tight;
+set(gca,'XTick',[], 'YTick', [])
+hgexport(gcf, ['results/image_3_figure_1.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+
+figure
+imagesc(im_gs); colormap hot; axis square tight;
+set(gca,'XTick',[], 'YTick', [])
+hgexport(gcf, ['results/image_3_figure_1_result.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+index
 %%
 
 a = angle(Transducer_Amp .* exp(1i * Transducer_Phase_Reshape));

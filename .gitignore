@@ -122,3 +122,4 @@ py to matlab/*.mat
 *.onnx
 py to matlab/dataset.mat
 *.mat
+*.tif

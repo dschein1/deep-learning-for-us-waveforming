@@ -55,21 +55,41 @@ widths_1
 
 mean(widths_base - widths_1)
 %%
-clu = parcluster;
-opts = parforOptions(clu);
-parfor (i=1:16,opts)
-    init_field
-end
 success_gs_total = [];
 success_gs_multi_total = [];
 success_1_total = [];
 pitch = 0.218e-3;
-x_min = -(256 - 1) * pitch/5;
-x_max = 256 * pitch/5;
-x_full = x_min:pitch/5:x_max;
-loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision with base model.mat');
+x_min = -(256 - 1) * pitch/3;
+x_max = 256 * pitch/3;
+x_full = x_min:pitch/3:x_max;
+x_min = -17e-3;
+x_max = 17e-3;
+z_min = 20e-3;
+z_max = 60e-3;
+x = linspace(x_min,x_max,200);
+z_field = linspace(z_min,z_max,300);
+N = 1024;
+pitch_half = pitch/2;
+x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
+x_full_gs = -(512-1)*pitch/2:pitch:512*pitch/2;
+x_for_line = x_full_gs(length(x_full_gs)/2 - 200:length(x_full_gs)/2 + 200);
+range_x = round(18.5e-3 / pitch_half);
+x_for_image = (-range_x * pitch_half):pitch_half:range_x*pitch_half;
+dz = 0.1e-3;
+z_max_gs = 2*40e-3;
+z = 20e-3:dz:60e-3;
+Frequancy = 4.464e6; 
+v = 1490; % water in room temperature m/sec (in body  v = 1540)
+Wavelength = v/Frequancy;
+mode = 'integers';
+if strcmp(mode,'floats')
+    loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision with base model.mat');
+else
+    loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision with base model integers.mat');
+end
 delays_base = loaded_for_comparision.from_gs;
 source = loaded_for_comparision.source;
+x_conv = loaded_for_comparision.x_acc;
 delays_net_base = loaded_for_comparision.from_net_base;
 delays_step_0 = loaded_for_comparision.from_net_step_0;
 delays_step_1 = loaded_for_comparision.from_net_step_1;
@@ -77,16 +97,24 @@ total_size = length(delays_step_1);
 size_of_step = floor(total_size / 3);
 peak_height = 0.5;
 total_results = zeros(3,10,3);
+total_amounts = zeros(10,3);
+total_mse = zeros(3,10,3);
+total_mse_conv = zeros(3,10,3);
 for i=1:3
-    success_gs = zeros(1,10);
-    over_count_gs = 0;
-    success_0 = zeros(1,10);
-    over_count_gs_multi = 0;
-    over_count_1 = 0;
-    success_1 = zeros(1,10);
+    success_gs = zeros(1,10)';
+    mse_gs = zeros(1,10)';
+    mse_gs_conv = zeros(1,10)';
+    success_0 = zeros(1,10)';
+    mse_0 = zeros(1,10)';
+    mse_1 = zeros(1,10)';
+    mse_0_conv = zeros(1,10)';
+    mse_1_conv = zeros(1,10)';
+    success_1 = zeros(1,10)';
     num_for_each = zeros(10,1);
     for j=(i-1) * size_of_step + 1:i *size_of_step
-        patterns = padarray(source(j,:),[0 256],0,'both');
+        
+        base_pattern = source(j,:);
+        patterns = padarray(base_pattern,[0 256],0,'both');
         [amps, delays_gs] = calculateGS(patterns,false);
         delays_gs = normalize_delays(delays_gs);
         delays_0 = normalize_delays(delays_step_0(j,:));
@@ -94,69 +122,413 @@ for i=1:3
         line_at_depth_gs = create_new_line(delays_gs);
         line_at_depth_0 = create_new_line(delays_0);
         line_at_depth_1 = create_new_line(delays_1);
-        [pks_gs,~,widths_base_gs,~] = findpeaks(line_at_depth_gs,x_full,'MinPeakHeight',peak_height);
-        [pks_0,~,widths_base_0,~] = findpeaks(line_at_depth_0,x_full,'MinPeakHeight',peak_height);
-        [pks_1,~,widths_base_1,~] = findpeaks(line_at_depth_1,x_full,'MinPeakHeight',peak_height);
-        [pks_base,~,widths_base,~] = findpeaks(source(i,:),x_full,'MinPeakHeight',peak_height);
+        [pks_base,locs_base,widths_base,~] = findpeaks(base_pattern,x_full_gs,'MinPeakHeight',peak_height);
+        locs_base = locs_base + abs(x_min);
+        locs_base = round(locs_base / (pitch/3));
+        pattern_for_comparision = zeros(1,512);
+        pattern_for_comparision(locs_base) = pks_base;
+        pattern_for_comparision_conv = interp1(x_full_gs,x_conv(j,:),x_full);
+        if strcmp(mode,'floats')
+            [pks_gs,locs_gs] = extract_peaks(line_at_depth_gs,pattern_for_comparision);
+            [pks_0,locs_0] = extract_peaks(line_at_depth_0, pattern_for_comparision);
+            [pks_1,locs_1] = extract_peaks(line_at_depth_1,pattern_for_comparision);
+        else
+            [pks_gs,locs_gs,widths_base_gs,~] = findpeaks(line_at_depth_gs,x_full,'MinPeakHeight',peak_height);
+            [pks_0,locs_0,widths_base_0,~] = findpeaks(line_at_depth_0,x_full,'MinPeakHeight',peak_height);
+            [pks_1,locs_1,widths_base_1,~] = findpeaks(line_at_depth_1,x_full,'MinPeakHeight',peak_height);        
+        end
+        
+        
         num_peaks = length(pks_base);
-        num_for_each(num_peaks) = num_for_each(num_peaks) + 1;
-        if length(pks_gs) == num_peaks
-            before = success_gs(num_peaks);
-            success_gs(num_peaks) =  before + 1;
+        if num_peaks == 3
+            j;
         end
-        if length(pks_0) == num_peaks
-            before = success_0(num_peaks);
-            success_0(num_peaks) = before + 1;
-        end
-        if length(pks_1) == num_peaks
-            before = success_1(num_peaks);
-            success_1(num_peaks) = before + 1;
+        if num_peaks < 11 && num_peaks > 0
+            if (num_peaks ~= length(pks_gs) || num_peaks ~= length(pks_0))  && j < 100
+                im_gs = squeeze(create_new_image(delays_gs));
+                im_0 = squeeze (create_new_image(delays_0));
+                %im_1 = squeeze(create_new_image(delays_1));
+
+                [amps, new_transducer] = calculateGS(patterns,true);
+                new_transducer = amps .* exp(1i * new_transducer);
+
+                new_transducer = padarray(new_transducer,[0 ((1024 - 128) / 2)]);
+                new_transducer = new_transducer(1,256:768 -1);
+                new_transducer = imresize(new_transducer,2,'box');
+
+                new_transducer = new_transducer(1,1:N);
+
+                clear E_FSP1_z0
+                index = 1;
+                for z0 = z
+                %     [E_FSP1_z0(index,:)] = FSP_X_near(Transducer,z0,N,pitch,Wavelength);
+                    %[E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+                
+                    [E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+                    index = index + 1;
+                    z0/z_max;
+                end
+                I_FSP1_z0 = abs(E_FSP1_z0).^2;
+                line_gs = abs(FSP_X_near(new_transducer,40e-3,N,pitch_half,Wavelength)).^2;
+                %line_gs = line_gs(N/2 - 200:N/2 + 200);
+                line_gs = interp1(x_half,line_gs,x_full);
+                line_gs = line_gs ./ max(max(line_gs));
+                I_FSP1_z0 = I_FSP1_z0(:,512 - range_x:512 + range_x);
+                [pks_gs_base,locs_gs_base] = extract_peaks(line_gs,pattern_for_comparision);
+                figure
+                ylabel('Intensity a.u')
+                subplot(2,3,1);
+                imagesc(x_for_image * 1e3,z * 1e3,I_FSP1_z0); colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,2);
+                imagesc(x_full * 1e3,z_field * 1e3,im_gs);colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,3);
+                imagesc(x_full * 1e3,z_field * 1e3,im_0);colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,4)
+                plot(x_full * 1e3,line_gs)%,pks_gs_base,locs_gs_base);
+                %plot(x_full,pattern_for_comparision_conv);
+                subplot(2,3,5);
+                plot(x_full * 1e3,line_at_depth_gs)%,pks_gs,locs_gs);
+                subplot(2,3,6);
+                plot(x_full * 1e3,line_at_depth_0)%,pks_0,locs_0);
+                %findpeaks(line_at_depth_1,x_full * 1e3,'MinPeakHeight',peak_height)
+                %subplot(2,4,4);
+                %findpeaks(line_at_depth_gs,x_full * 1e3,'MinPeakHeight',peak_height)
+
+%                 subplot(2,3,7);
+%                 imagesc(x_full * 1e3,z_field * 1e3,im_1);colormap jet; axis square; axis on; zoom(1);
+
+                j;
+                if strcmp(mode,'floats')
+                    hgexport(gcf, ['results/figures comparision/' int2str(j) ' ' int2str(num_peaks) '.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+                else
+                    hgexport(gcf, ['results/figures comparision integers/' int2str(j) ' ' int2str(num_peaks) '.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+                end
+                close all
+            end
+            num_for_each(num_peaks) = num_for_each(num_peaks) + 1;
+            if length(pks_gs) == num_peaks
+                before = success_gs(num_peaks);
+                success_gs(num_peaks) =  before + 1;
+            end
+            if length(pks_0) == num_peaks
+                before = success_0(num_peaks);
+                success_0(num_peaks) = before + 1;
+            end
+            if length(pks_1) == num_peaks
+                before = success_1(num_peaks);
+                success_1(num_peaks) = before + 1;
+            end
+            mse_gs(num_peaks) = mse_gs(num_peaks) + sum((line_at_depth_gs - pattern_for_comparision).^2);
+            mse_1(num_peaks) = mse_1(num_peaks) + sum((line_at_depth_1 - pattern_for_comparision).^2);
+            mse_0(num_peaks) = mse_0(num_peaks) + sum((line_at_depth_0 - pattern_for_comparision).^2);
+            mse_gs_conv(num_peaks) = mse_gs_conv(num_peaks) + sum((line_at_depth_gs - pattern_for_comparision_conv).^2);
+            mse_1_conv(num_peaks) = mse_1_conv(num_peaks) + sum((line_at_depth_1 - pattern_for_comparision_conv).^2);
+            mse_0_conv(num_peaks) = mse_0_conv(num_peaks) + sum((line_at_depth_0 - pattern_for_comparision_conv).^2);
         end
 
     end
         total_results(1,:,i) = success_gs';
         total_results(2,:,i) = success_0';
-        total_results(3,:,i) = success_1';
+        total_results(3,:,i) = success_1'; 
+        total_amounts(:,i) = num_for_each;
+        total_mse(1,:,i) = mse_gs';
+        total_mse(2,:,i) = mse_0';
+        total_mse(3,:,i) = mse_1';
+        total_mse_conv(1,:,i) = mse_gs_conv';
+        total_mse_conv(2,:,i) = mse_0_conv';
+        total_mse_conv(3,:,i) = mse_1_conv';
 end
 
 full.gs = success_gs_total;
-full.gs_multi = success_0;
-full.floats = success_1_total;
-save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi.mat' full
+full.single_phase = success_0;
+full.double_phase = success_1_total;
+full.total_results = total_results;
+full.total_amount = total_amounts;
+full.total_mse = total_mse;
+full.total_mse_conv = total_mse_conv;
+if strcmp(mode,'floats')
+    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi.mat' full
+else
+    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi integers.mat' full
+end
+%%
+mode = 'integers';
+success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi.mat';
+MSE_conv_image = 'results/results comparision success MSE conv only gs 0.tif';
+success_rate_image = 'results/results comparision success only gs 0.tif';
+MSE_image = 'results/results comparision success MSE only gs 0.tif';
+if strcmp(mode,'integers')
+    success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi integers.mat';
+    success_rate_image = 'results/results comparision success only gs 0 integers.tif';
+    MSE_image = 'results/results comparision success MSE only gs 0 integers.tif';
+    MSE_conv_image = 'results/results comparision success MSE conv only gs 0 integers.tif';
+end
+full = load(success_name);
+total_results = full.full.total_results;
+total_amounts = full.full.total_amount;
+pct = zeros(2,10,3);
+pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+%pct(3,:,:) = squeeze(total_results(3,:,:)) ./ total_amounts;
+means = mean(pct,3)';
+stds = std(pct,0,3)';
 
-means = mean(total_results,2);
-stds = std(total_results,0,2);
-
-y = means;
-error_bar = stds;
+y = squeeze(means);
+error_bar = squeeze(stds);
 figure
-h = bar(y); ylabel('Success rate %'); xlabel('Number of focuses')
-%set(h, {'DisplayName'}, {'Output from Gershberg-Saxton' 'Output from model' 'Output from Gershberg-Saxton with multi-cycle'})
-legend('GS' 'Model Single Phase' 'Model Double Phase')
+h = plot(y); ylabel('Success rate %'); xlabel('Number of focuses')
+legend({'GS' 'MultiLevelNet'})
 hold on
-% Calculate the number of groups and number of bars in each group
-[ngroups,nbars] = size(y)
-% Get the x coordinate of the bars
-x_new = nan(nbars, ngroups);
-for i = 1:nbars
-    h(i).XEndPoints
-
-    x_new(i,:) = h(i).XEndPoints';
-end
-oldy = get(gca, 'ylim')
-if oldy(1) > '0'
-    oldy = [0 oldy(2) * 2]
-end
-set(gca,'YLim',[0 1.2])
-% Plot the errorbars
-errorbar(x_new',y,error_bar,'k','linestyle','none','HandleVisibility','off');
+errorbar(y,error_bar,'k','linestyle','none','HandleVisibility','off');
 % 
 grid on
-set(gca,'xTick',[-5:2.5:+5])
-set(gca,'YTick',[-dB:+dB/2:0])
-set(gca,'xTickLabel',[])
-set(gca,'YTickLabel',[])
-hgexport(gcf, ['Sim_PSF_Lateral',num2str(dB),'dB.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+hgexport(gcf, [success_rate_image], hgexport('factorystyle'), 'Format', 'tiff');
+% total_results = full.full.total_mse;
+% pct = zeros(2,10,3);
+% pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+% pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+% %pct(3,:,:) = squeeze(total_results(3,:,:)) ./ total_amounts;
+% means = mean(pct,3)';
+% stds = std(pct,0,3)';
+% 
+% y = squeeze(means);
+% error_bar = squeeze(stds);
+% figure
+% h = plot(y); ylabel('MSE'); xlabel('Number of focuses')
+% legend({'GS' 'Model Single Phase' })
+% hold on
+% grid on
+% hgexport(gcf, [MSE_image], hgexport('factorystyle'), 'Format', 'tiff');
+total_results = full.full.total_mse_conv;
+pct = zeros(2,10,3);
+pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+%pct(3,:,:) = squeeze(total_results(3,:,:)) ./ total_amounts;
+means = mean(pct,3)';
+stds = std(pct,0,3)';
+
+y = squeeze(means);
+error_bar = squeeze(stds);
+figure
+h = plot(y); ylabel('MSE'); xlabel('Number of focuses')
+legend({'GS' 'MultiLevelNet' })
+hold on
+errorbar(y,error_bar,'k','linestyle','none','HandleVisibility','off');
+% 
+grid on
+hgexport(gcf, [MSE_conv_image], hgexport('factorystyle'), 'Format', 'tiff');
+
+%%
+spacing_factor = 2;
+pitch = 0.218e-3;
+x_min = -17e-3;
+x_max = 17e-3;
+z_min = 20e-3;
+z_max = 60e-3;
+x = linspace(x_min,x_max,200);
+x_min = -(256 - 1) * pitch/spacing_factor;
+x_max = 256 * pitch/spacing_factor;
+x_full = x_min:pitch/spacing_factor:x_max;
+z_field = linspace(z_min,z_max,300);
+N = 1024;
+pitch_half = pitch/2;
+x_half = -(N-1)*pitch_half/2:pitch_half:N*pitch_half/2;
+x_full_gs = -(512-1)*pitch/2:pitch:512*pitch/2;
+x_for_line = x_full_gs(length(x_full_gs)/2 - 200:length(x_full_gs)/2 + 200);
+range_x = round(18.5e-3 / pitch_half);
+x_for_image = (-range_x * pitch_half):pitch_half:range_x*pitch_half;
+
+dz = 0.1e-3;
+z_max_gs = 2*40e-3;
+z = 0:dz:z_max_gs;
+Frequancy = 4.464e6; 
+v = 1490; % water in room temperature m/sec (in body  v = 1540)
+Wavelength = v/Frequancy;
+num_peaks = 5;
+loaded_for_comparision = load(['C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision ' num2str(num_peaks) ' focus.mat']);
+
+peak_height = 0.5;
+total_results = zeros(2,19,3);
+total_amounts = zeros(19,3);
+total_mse = zeros(2,19,3);
+total_mse_conv = zeros(2,19,3);
+
+for separation=5:24
+    source_sep = loaded_for_comparision.(['sources_' int2str(separation - 5)]);
+    base_sep = loaded_for_comparision.(['base_patterns_' int2str(separation - 5)]);
+    delays_sep = loaded_for_comparision.(['results_' int2str(separation - 5)]);
+    size_to_compute = size(delays_sep,1);
+    perm = randperm(size_to_compute);
+    step_size = floor(size_to_compute / 3);
+    success_gs_sep = zeros(1,3);
+    success_net_sep = zeros(1,3);
+    mse_gs_sep = zeros(1,3); 
+    mse_gs_conv_sep = zeros(1,3);
+    mse_net_sep = zeros(1,3);
+    mse_net_conv_sep = zeros(1,3);
+    num_for_each = ones(1,3) * step_size;
+    for i=1:3
+        for k = (i-1) * step_size + 1:i * step_size
+            j = perm(k);
+            base_pattern = base_sep(j,:);
+            patterns = padarray(base_pattern,[0 256],0,'both');
+            [amps,delays_gs] = calculateGS(patterns,false);
+            delays_gs = normalize_delays(delays_gs);
+            delays_0 = normalize_delays(delays_sep(j,:));
+            line_at_depth_gs = create_new_line(delays_gs,ones(1,128),1,spacing_factor);
+            line_at_depth_0 = create_new_line(delays_0,ones(1,128),1,spacing_factor);
+            [pks_base,locs_base,widths_base,~] = findpeaks(base_pattern,x_full_gs,'MinPeakHeight',peak_height);
+            locs_base = locs_base + abs(x_min);
+            locs_base = round(locs_base / (pitch/spacing_factor)) + 1 ;
+            pattern_for_comparision = zeros(1,512);
+            pattern_for_comparision(locs_base) = pks_base;
+            pattern_for_comparision_conv = interp1(x_full_gs,source_sep(j,:),x_full);
+            [pks_gs,locs_gs,widths_base_gs,~] = findpeaks(line_at_depth_gs,x_full,'MinPeakHeight',peak_height);
+            [pks_0,locs_0,widths_base_0,~] = findpeaks(line_at_depth_0,x_full,'MinPeakHeight',peak_height);
+            if length(pks_gs) == 0 || length(pks_0) == 0
+                j
+            end
+        if (num_peaks ~= length(pks_gs) || num_peaks ~= length(pks_0))  && i * k < 10
+                im_gs = squeeze(create_new_image(delays_gs));
+                im_0 = squeeze (create_new_image(delays_0));
+                %im_1 = squeeze(create_new_image(delays_1));
+
+                [amps, new_transducer] = calculateGS(patterns,false);
+                new_transducer = amps .* exp(1i * new_transducer);
+
+                new_transducer = padarray(new_transducer,[0 ((1024 - 128) / 2)]);
+                new_transducer = new_transducer(1,256:768 -1);
+                new_transducer = imresize(new_transducer,2,'box');
+
+                new_transducer = new_transducer(1,1:N);
+
+                clear E_FSP1_z0
+                index = 1;
+                for z0 = z
+                %     [E_FSP1_z0(index,:)] = FSP_X_near(Transducer,z0,N,pitch,Wavelength);
+                    %[E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+                
+                    [E_FSP1_z0(index,:)] = FSP_X_near(new_transducer,z0,N,pitch_half,Wavelength);
+                    index = index + 1;
+                    z0/z_max;
+                end
+                I_FSP1_z0 = abs(E_FSP1_z0).^2;
+                line_gs = abs(FSP_X_near(new_transducer,40e-3,N,pitch_half,Wavelength)).^2;
+                %line_gs = line_gs(N/2 - 200:N/2 + 200);
+                line_gs = interp1(x_half,line_gs,x_full);
+                line_gs = line_gs ./ max(max(line_gs));
+                I_FSP1_z0 = I_FSP1_z0(:,512 - range_x:512 + range_x);
+                [pks_gs_base,locs_gs_base] = extract_peaks(line_gs,pattern_for_comparision);
+                figure
+                ylabel('Intensity a.u')
+                subplot(2,3,1);
+                imagesc(x_for_image * 1e3,z * 1e3,I_FSP1_z0); colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,2);
+                imagesc(x_full * 1e3,z_field * 1e3,im_gs);colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,3);
+                imagesc(x_full * 1e3,z_field * 1e3,im_0);colormap hot; axis square; axis on; zoom(1);
+                subplot(2,3,4)
+                plot(x_full * 1e3,line_gs)%,pks_gs_base,locs_gs_base);
+                %plot(x_full,pattern_for_comparision_conv);
+                subplot(2,3,5);
+                plot(x_full * 1e3,line_at_depth_gs)%,pks_gs,locs_gs);
+                subplot(2,3,6);
+                plot(x_full * 1e3,line_at_depth_0)%,pks_0,locs_0);
+                %findpeaks(line_at_depth_1,x_full * 1e3,'MinPeakHeight',peak_height)
+                %subplot(2,4,4);
+                %findpeaks(line_at_depth_gs,x_full * 1e3,'MinPeakHeight',peak_height)
+
+%                 subplot(2,3,7);
+%                 imagesc(x_full * 1e3,z_field * 1e3,im_1);colormap jet; axis square; axis on; zoom(1);
+
+                j;
+                path_for_figure = ['results/figures comparision patterns/separation: ' int2str(separation) ' index: ' int2str(i*k) '.tif'];
+                hgexport(gcf, [path_for_figure], hgexport('factorystyle'), 'Format', 'tiff');
+                close all
+            end
+            
+            if length(pks_gs) == num_peaks
+                before = success_gs_sep(i);
+                success_gs_sep(i) =  before + 1;
+            elseif true
+                length(pks_gs); 
+            end
+        if length(pks_0) == num_peaks
+            before = success_net_sep(i);
+            success_net_sep(i) = before + 1;
+        end
+        
+         mse_gs_sep(i) = mse_gs_sep(i) + sum((line_at_depth_gs - pattern_for_comparision).^2);
+         mse_net_sep(i) = mse_net_sep(i) + sum((line_at_depth_0 - pattern_for_comparision).^2);
+         mse_gs_conv_sep(i) = mse_gs_conv_sep(i) + sum((line_at_depth_gs - pattern_for_comparision_conv).^2);
+         mse_net_conv_sep(i) = mse_net_conv_sep(i) + sum((line_at_depth_0 - pattern_for_comparision_conv).^2);
+        end
+    end
+
+    
+        total_results(1,separation - 4,:) = success_gs_sep';
+        total_results(2,separation - 4,:) = success_net_sep';
+        total_amounts(separation - 4,:) = num_for_each';
+        total_mse(1,separation - 4,:) = mse_gs_sep';
+        total_mse(2,separation - 4,:) = mse_net_sep';
+        total_mse_conv(1,separation - 4,:) = mse_gs_conv_sep';
+        total_mse_conv(2,separation - 4,:) = mse_net_conv_sep';
+end
+
+full.total_results = total_results;
+full.total_amount = total_amounts;
+full.total_mse = total_mse;
+full.total_mse_conv = total_mse_conv;
+
+name_to_save = ['py to matlab/success rate 3 repeats ' num2str(num_peaks) ' focus.mat']; 
+save(name_to_save,'full')
+
+num_foci = num_peaks;
+success_name = name_to_save;
+MSE_conv_image = ['results/results comparision ' num2str(num_foci) ' focus MSE conv.tif'];
+success_rate_image = ['results/results comparision ' num2str(num_foci) ' focus success rate.tif'];
+MSE_image = ['results/results comparision ' num2str(num_foci) ' focus MSE.tif'];
+x_separation = 5 * pitch*1e3:pitch * 1e3:24 * pitch * 1e3;
+full = load(success_name);
+total_results = full.full.total_results;
+total_amounts = full.full.total_amount;
+pct = zeros(2,20,3);
+pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+%pct(3,:,:) = squeeze(total_results(3,:,:)) ./ total_amounts;
+means = mean(pct,3)';
+stds = std(pct,0,3)';
+
+y = squeeze(means);
+error_bar = squeeze(stds);
+figure
+h = plot(x_separation,y); ylabel('Success rate %','FontSize',16); xlabel('Separation between foci [mm]','FontSize',16)
+legend({'GS' 'MultiLevelNet'})
+hold on
+errorbar([x_separation; x_separation]',y,error_bar,'k','linestyle','none','HandleVisibility','off');
+% 
+grid on
+hgexport(gcf, [success_rate_image], hgexport('factorystyle'), 'Format', 'tiff');
+
+total_results = full.full.total_mse_conv;
+pct = zeros(2,20,3);
+pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+%pct(3,:,:) = squeeze(total_results(3,:,:)) ./ total_amounts;
+means = mean(pct,3)';
+stds = std(pct,0,3)';
+
+y = squeeze(means);
+error_bar = squeeze(stds);
+figure
+h = plot(x_separation,y); ylabel('MSE','FontSize',16); xlabel('Separation between foci [mm]','FontSize',16)
+legend({'GS' 'MultiLevelNet' })
+hold on
+errorbar([x_separation; x_separation]',y,error_bar,'k','linestyle','none','HandleVisibility','off');
+% 
+grid on
+hgexport(gcf, [MSE_conv_image], hgexport('factorystyle'), 'Format', 'tiff');
+
 %%
 success_gs_total = [];
 success_gs_multi_total = [];
@@ -464,59 +836,148 @@ errorbar(x,y_success,std_success,'k','LineStyle','none')
 %%
 init_field
 loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\comparision effective diffraction.mat');
-source = loaded_for_comparision.source;
-delays_net_base = loaded_for_comparision.from_net_base;
-delays_step_0 = loaded_for_comparision.from_net_step_0;
-delays_step_1 = loaded_for_comparision.from_net_step_1;
-effective_thresh = zeros(3,8);
+source = double(loaded_for_comparision.source);
+base = double(loaded_for_comparision.base_patterns);
+%delays_net_base = loaded_for_comparision.from_net_base;
+delays_step_0 = double(loaded_for_comparision.from_net_step_0);
+%delays_step_1 = loaded_for_comparision.from_net_step_1;
+effective_thresh = zeros(2,9);
 
 pitch = 0.218e-3;
-x_min = -(256 - 1) * pitch/5;
+x_min = -(256 - 1) * pitch;
+x_max = 256 * pitch;
 
+x_full = x_min:pitch:x_max;
+x_min = -(256 - 1) * pitch/3;
+x_max = 256 * pitch/3;
 
-x_max = 256 * pitch/5;
-x_full = x_min:pitch/5:x_max;
+x_line = x_min:pitch/3:x_max;
 peak_thresh = 0.5;
+x_full_gs = -(512-1)*pitch/2:pitch:512*pitch/2;
+results_success = zeros(2,9,25);
 for num_focus=2:10
-    separation=2;
-    gs_found = false;
-    gs_multi_found = false;
-    model_found = false;
-    while separation<12 && ~gs_found && ~gs_multi_found && ~model_found
-        %patterns = padarray(source(i,:),[0 256],0,'both');
-        temp = source(num_focus - 1,separation - 1,:);
-        temp = reshape(temp,1,512);
-        base = padarray(temp,[0 256],0,'both');
-
-        [amps, delays_gs] = calculateGS(base,false);
+    for separation=2:29
+        base_pattern = source(num_focus - 1,separation - 1,:);
+        base_pattern = reshape(base_pattern,[1,512]);
+        patterns = padarray(base_pattern,[0 256],0,'both');
+        delays_model = delays_step_0(num_focus - 1, separation - 1,:);
+        delays_model = reshape(delays_model,[1,128]);
+        [amps, delays_gs] = calculateGS(patterns,false);
         delays_gs = normalize_delays(delays_gs);
-        if ~gs_found
-            line = create_new_line(delays_gs);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
-            if length(pks) == num_focus
-                gs_found = true;
-                effective_thresh(1,num_focus - 1) = separation;
-            end
+        delays_model = normalize_delays(delays_model);
+        fut = parfeval(@create_new_line, 1, delays_gs);
+        
+        % Block for up to maxTime seconds waiting for a result
+        didFinish = wait(fut, 'finished', 30);
+        if ~didFinish
+        % Execution didn't finish in time, cancel this iteration
+            cancel(fut);
+            line_gs = zeros(1,512);
+        else
+        % Did complete, retrieve results
+            line_gs = fetchOutputs(fut);
         end
-        if ~gs_multi_found
-            line = create_new_line(delays_gs,amps,10);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
-            if length(pks) == num_focus
-                gs_multi_found = true;
-                effective_thresh(2,num_focus - 1) = separation;
-            end
+        fut = parfeval(@create_new_line, 1, delays_model);
+        %line_model = create_new_line(delays_model);
+        % Block for up to maxTime seconds waiting for a result
+
+        didFinish = wait(fut, 'finished', 30);
+        if ~didFinish
+        % Execution didn't finish in time, cancel this iteration
+            cancel(fut);
+            line_model = zeros(1,512);
+        else
+        % Did complete, retrieve results
+            line_model = fetchOutputs(fut);
         end
-        if ~model_found
-            delays = double(delays_step_1(num_focus - 1,separation - 1,:));
-            delays = normalize_delays(delays);
-            line = create_new_line(delays);
-            [pks,~,~,~] = findpeaks(line,x_full,'MinPeakHeight',peak_thresh);
-            if length(pks) == num_focus
-                model_found = true;
-                effective_thresh(3,num_focus - 1) = separation;
-            end
+        %line_gs = create_new_line(delays_gs);
+        %line_model = create_new_line(delays_model);
+        [pks_base,locs_base,widths_base,~] = findpeaks(base_pattern,x_full_gs,'MinPeakHeight',peak_thresh);
+        [pks_gs,~,~,~] = findpeaks(line_gs,x_line,'MinPeakHeight',peak_thresh);%,'MinPeakDistance',separation * pitch / 2,'MinPeakProminence',0.2);
+        [pks_model,~,~,~] = findpeaks(line_model,x_line,'MinPeakHeight',peak_thresh);%,'MinPeakDistance',separation * pitch / 2,'MinPeakProminence',0.2);
+        if length(pks_gs) == num_focus
+            results_success(1,num_focus - 1,separation - 1) = 1;
         end
-        separation = separation + 1;
+        if length(pks_model) == num_focus
+            results_success(2,num_focus - 1,separation - 1) = 1;
+        end  
     end
 end
-plot(effective_thresh)
+
+results_gs = squeeze(results_success(1,:,:));
+results_model = squeeze(results_success(2,:,:));
+[~,minimums_gs] = max(results_gs,[],2);
+[~,minimums_net] = max(results_model,[],2);
+[~,maximums_gs] = max(flip(results_gs,2),[],2);
+[~,maximums_net] = max(flip(results_model,2),[],2);
+maximums_gs = 29 - maximums_gs;
+maximums_net = 29 - maximums_net;
+x_range = 2:10;
+separation_range = pitch * 2:19;
+figure
+plot(x_range,minimums_gs * pitch * 1e3); ylabel('separation between foci [mm]'); xlabel('number of foci')
+hold on
+plot(x_range,minimums_net * pitch * 1e3)
+legend({'GS','model'})
+hgexport(gcf, ['results/minimal distance plot.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+figure
+plot(x_range,maximums_gs * pitch * 1e3); ylabel('separation between foci [mm]'); xlabel('number of foci')
+hold on
+plot(x_range,maximums_net * pitch * 1e3)
+legend({'GS','model'})
+hgexport(gcf, ['results/maximal distance plot.tif'], hgexport('factorystyle'), 'Format', 'tiff');
+%%
+num_focus = 4;
+separation = 3;
+src = base(num_focus - 1,separation - 1,:);
+base_pattern = source(num_focus - 1,separation - 1,:);
+delays_model = delays_step_0(num_focus - 1, separation - 1,:);
+delays_model = reshape(delays_model,[1,128]);
+delays_model = normalize_delays(delays_model);
+
+base_pattern = reshape(base_pattern,[1,512]);
+patterns = padarray(base_pattern,[0 256],0,'both');
+[amps, delays_gs] = calculateGS(patterns,false);
+delays_gs = normalize_delays(delays_gs);
+line = create_new_line(delays_gs);
+figure
+plot(x_full,squeeze(src))
+hold on
+findpeaks(line,x_line,'MinPeakHeight',peak_thresh,'MinPeakDistance',separation * pitch / 2,'MinPeakProminence',0.2)
+%%
+
+function plot_peaks(x,y,peaks,locs)
+    plot(x,y);
+    hold on
+    scatter(x(locs),peaks + 0.05,[],'v','MarkerFaceColor',[0,0,0],'MarkerEdgeColor',[0,0,0])
+end
+function [peaks,locs] = extract_peaks(input, pattern)
+    pitch = 0.218e-3;
+    x_min = -(256 - 1) * pitch/3;
+    x_max = 256 * pitch/3;
+    x_full = x_min:pitch/3:x_max;
+    peaks = [];
+    locs = [];
+    peak_height = 0.5;
+    [pks_base,locs_base,~,~] = findpeaks(pattern,'MinPeakHeight',peak_height);
+    [pks_input,locs_input,~,~] = findpeaks(input,'MinPeakHeight',peak_height/2,'MinPeakDistance',2);
+    j = 1;
+    for i=1:length(pks_input)
+        if j > length(pks_base) && pks_input(i) > peak_height
+            peaks = [];
+            locs = [];
+            break
+        elseif j > length(pks_base)
+            continue
+        end
+        if  pks_base(j)/2 < pks_input(i) && abs(locs_base(j) - locs_input(i)) < 30
+            peaks = [peaks pks_input(i)];
+            locs = [locs locs_input(i)];
+            j = j + 1;
+        elseif pks_input(i) > peak_height
+            peaks = [];
+            locs = [];
+            break
+        end
+    end
+end

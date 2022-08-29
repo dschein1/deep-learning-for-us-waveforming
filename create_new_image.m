@@ -29,10 +29,10 @@ function total_result = create_new_image(delays,amp,num_cycles)
     excitation = sin(2*pi*f0*te+pi); % Excitation signal
     xdc_excitation(Th, excitation);
     xdc_apodization(Th, 0, Apo');
-    x_min = -15-3;
+    x_min = -15e-3;
     x_max = 15e-3;
-    z_min = 10e-3;
-    z_max = 70e-3;
+    z_min = 20e-3;
+    z_max = 60e-3;
     x = linspace(x_min,x_max,200);
     z = linspace(z_min,z_max,300);
     total_result = zeros(size(delays,1),300,200);
@@ -50,10 +50,10 @@ function total_result = create_new_image(delays,amp,num_cycles)
         end
         im = im - min(min(im));
         im = im/max(max(im));
-        %db_val = 40;
-        %const_b = 10^(-db_val/20);
-        %const_a = 1-const_b;
-        %im = 20*log10(const_a * im +const_b);
+        db_val = 40;
+        const_b = 10^(-db_val/20);
+        const_a = 1-const_b;
+        im = 20*log10(const_a * im +const_b);
         total_result(i,:,:) = im;
     end
 %     z_repeat = reshape(repmat(z,1,100),[],1);

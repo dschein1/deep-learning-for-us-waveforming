@@ -61,7 +61,7 @@ def RMSE(yhat,y):
     return torch.sqrt(torch.mean((yhat-y)**2))
 
 def create_wave_for_propagation(source):
-    if source.shape[1] == 128:
+    if (source.ndim != 1 and source.shape[1] == 128) or (source.shape[0] == 128):
         return torch.ones(source.shape, device=configuration.device) * torch.exp(torch.tensor(1j) * source)
     else:
         return source[:,:128] * torch.exp(1j * source[:,128:])

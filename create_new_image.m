@@ -29,8 +29,8 @@ function total_result = create_new_image(delays,amp,num_cycles)
     excitation = sin(2*pi*f0*te+pi); % Excitation signal
     xdc_excitation(Th, excitation);
     xdc_apodization(Th, 0, Apo');
-    x_min = -15e-3;
-    x_max = 15e-3;
+    x_min = -17e-3;
+    x_max = 17e-3;
     z_min = 20e-3;
     z_max = 60e-3;
     x = linspace(x_min,x_max,200);
@@ -41,19 +41,30 @@ function total_result = create_new_image(delays,amp,num_cycles)
     im = zeros(300,200);
     for i=1:size(delays,1)
         xdc_focus_times(Th,0,delays(i,:));
-        for j=1:200            
-            points(:,1) = x(j);
+        parfor j=1:200 
+            init_field
+            Th = xdc_linear_array (Number_of_Elements, width, height, kerf, 4, 1, focus);
+            impulse_response=sin(2*pi*f0*te+pi);
+            impulse_response=impulse_response.*hanning(max(size(impulse_response)))';
+            xdc_impulse (Th, impulse_response);
+            excitation = sin(2*pi*f0*te+pi); % Excitation signal
+            xdc_excitation(Th, excitation);
+            xdc_apodization(Th, 0, Apo');
+            xdc_focus_times(Th,0,delays(i,:));
+            local_points = points;
+            local_points(:,1) = x(j);
+%             points(:,1) = x(j);
 %     point = [0 0 depth];
-            [temp,~] = calc_hp(Th,points);
+            [temp,~] = calc_hp(Th,local_points);
             p = vecnorm(temp,2,1);
             im(:,j) = p;
         end
         im = im - min(min(im));
         im = im/max(max(im));
-        db_val = 40;
-        const_b = 10^(-db_val/20);
-        const_a = 1-const_b;
-        im = 20*log10(const_a * im +const_b);
+%         db_val = 20;
+%         const_b = 10^(-db_val/20);
+%         const_a = 1-const_b;
+%         im = 20*log10(const_a * im +const_b);
         total_result(i,:,:) = im;
     end
 %     z_repeat = reshape(repmat(z,1,100),[],1);

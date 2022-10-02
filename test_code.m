@@ -11,10 +11,10 @@ patterns = zeros(1,1024);
 %patterns(490) = 1;
 % %patterns(500) = 1;
 % patterns(512 - 6) = 1;
-% patterns(512 + 6) = 1;
+%patterns(512 + 6) = 1;
 patterns(512) = 1;
-% patterns(512 + 12) = 1;
-% patterns(512 - 12) = 1;
+patterns(512 + 12) = 1;
+patterns(512 - 12) = 1;
 
 [amps, delays_gs] =  calculateGS(patterns,false);
 i = 1;

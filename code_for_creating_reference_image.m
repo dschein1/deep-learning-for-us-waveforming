@@ -2,6 +2,7 @@ base_folder = '.\hydrophone measurments\';
 addpath(base_folder);
 files = dir('hydrophone measurments\');
 base_name = 'single_data';
+name_to_add = 'both regular';
 pitch = 0.218e-3;
 N = 1024;
 pitch_half = pitch/2;
@@ -14,12 +15,15 @@ x_full_gs = -(512-1)*pitch/2:pitch:512*pitch/2;
 range_x = round(9.5e-3 / pitch_half);
 x_for_image = (-range_x * pitch_half):pitch_half:range_x*pitch_half;
 x = -9:0.15:9;
-
+size_cut = round(size(z,2)/4);
+shift_cut =  round(3e-3/dz);
+z_flipped_cut = z_flipped(1,2 * size_cut - shift_cut:end - shift_cut);
+z_cut = z(1,size_cut:3 * size_cut + 1);
 Frequancy = 4.464e6; 
 v = 1490; % water in room temperature m/sec (in body  v = 1540)
 Wavelength = v/Frequancy;
 clear E_FSP1_z0;
-first = true;
+first = 3;
 for index=1:numel(files)
     file_ = files(index);
     if file_.isdir && ~contains(file_.name,'.')
@@ -123,14 +127,13 @@ for index=1:numel(files)
         figure
         %subplot(2,3,1)
         imagesc(x_for_image * 1e3,z * 1e3,I_FSP1_z0); axis square;axis on;colormap hot;
-        if first
+        if first > 0
             a = gca;
             xlabel('x [mm]','FontSize',26); ylabel('z [mm]','FontSize',26);
             a.FontSize = 26;
             pos1 = get(a,'Position');
             colorbar('eastoutside')
             set(a,'Position',pos1)
-            first = false;
         else
             set(gca,'xticklabel',[])
             set(gca,'yticklabel',[])
@@ -143,13 +146,13 @@ for index=1:numel(files)
 
         set(gca,'xticklabel',[])
         set(gca,'yticklabel',[])
-        hgexport(gcf, [[base_folder file_.name '\gs image']], hgexport('factorystyle'), 'Format', 'tiff');
+        hgexport(gcf, [[base_folder file_.name '\gs image' ]], hgexport('factorystyle'), 'Format', 'tiff');
         figure
         imagesc(x,z_flipped * 1e3,data_net')
         axis square; axis on; colormap hot%je        
         set(gca,'xticklabel',[])
         set(gca,'yticklabel',[])       
-        hgexport(gcf, [[base_folder file_.name '\USDL image']], hgexport('factorystyle'), 'Format', 'tiff');        
+        hgexport(gcf, [[base_folder file_.name '\USDL image' ]], hgexport('factorystyle'), 'Format', 'tiff');        
         figure
         line = data_gs(:,round(size(data_gs,2)/2));
         line = line - min(line);
@@ -164,6 +167,72 @@ for index=1:numel(files)
         line = line ./ max(line);
         plot(x,line', 'LineWidth',2);
         hgexport(gcf, [[base_folder file_.name '\cross section']], hgexport('factorystyle'), 'Format', 'tiff');
+        
+        % generate images after cut
+        fig = figure;
+        fig.Position = [100 100 700 400];
+        I_FSP1_z0 = I_FSP1_z0(size_cut:3 * size_cut + 1,:);
+        %subplot(2,3,1)
+        imagesc(x_for_image * 1e3,z_cut * 1e3,I_FSP1_z0);
+        if first > 0 
+            a = gca;
+            xlabel('x [mm]','FontSize',26); ylabel('z [mm]','FontSize',26);
+            a.FontSize = 26;
+            pos1 = get(a,'Position');
+            colorbar('eastoutside')
+            set(a,'Position',pos1)
+        else
+            set(gca,'xticklabel',[])
+            set(gca,'yticklabel',[])
+        end
+        axis equal tight;axis on;colormap hot;
+        hgexport(gcf, [[base_folder file_.name '\cw image cut']], hgexport('factorystyle'), 'Format', 'tiff');
+        data_gs_cut_center = data_gs(:,size_cut:3 * size_cut + 1);
+        fig = figure;
+        fig.Position = [100 100 700 400];
+        imagesc(x,z_flipped_cut * 1e3,data_gs_cut_center')
+        axis equal tight;axis on; colormap hot%je
+
+        set(gca,'xticklabel',[])
+        set(gca,'yticklabel',[])
+        hgexport(gcf, [[base_folder file_.name '\gs image cut center']], hgexport('factorystyle'), 'Format', 'tiff');
+        
+        data_gs = data_gs(:,1 + shift_cut:2 * size_cut + shift_cut);
+        fig = figure;
+        fig.Position = [100 100 700 400];
+        imagesc(x,z_flipped_cut * 1e3,data_gs')
+        axis equal tight;axis on; colormap hot%je
+
+        set(gca,'xticklabel',[])
+        set(gca,'yticklabel',[])
+        hgexport(gcf, [[base_folder file_.name '\gs image cut']], hgexport('factorystyle'), 'Format', 'tiff');
+        
+        data_net = data_net(:,1 + shift_cut:2 * size_cut + shift_cut);
+        fig = figure;
+        fig.Position = [100 100 700 400];
+        imagesc(x,z_flipped_cut * 1e3,data_net')
+        axis equal tight;axis on; colormap hot%je        
+        set(gca,'xticklabel',[])
+        set(gca,'yticklabel',[])       
+        hgexport(gcf, [[base_folder file_.name '\USDL image cut']], hgexport('factorystyle'), 'Format', 'tiff');        
+        fig = figure;
+        fig.Position = [100 100 700 400];
+        line = data_gs_cut_center(:,round(size(data_gs_cut_center,2)/2));
+        line = line - min(line);
+        line = line ./ max(line);
+        plot(x,line','LineWidth',2); axis tight square; axis on;
+        a = gca;    
+        a.FontSize = 26;
+        xlabel('x [mm]','FontSize',26); ylabel('Intensity [a.u]', FontSize=26);
+        hold on
+        line = data_net(:,round(size(data_net,2)/2));
+        line = line - min(line);
+        line = line ./ max(line);
+        plot(x,line', 'LineWidth',2);
+        hgexport(gcf, [[base_folder file_.name '\cross section cut']], hgexport('factorystyle'), 'Format', 'tiff');
+
+        first = first - 1;
+
     end
 end
    close all

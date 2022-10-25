@@ -59,8 +59,8 @@ function total_result = create_new_image(delays,amp,num_cycles)
             p = vecnorm(temp,2,1);
             im(:,j) = p;
         end
-        im = im - min(min(im));
-        im = im/max(max(im));
+        %im = im - min(min(im));
+        %im = im/max(max(im));
 %         db_val = 20;
 %         const_b = 10^(-db_val/20);
 %         const_a = 1-const_b;

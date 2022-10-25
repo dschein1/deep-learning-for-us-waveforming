@@ -115,7 +115,8 @@ for i=1:3
     success_1 = zeros(1,10)';
     num_for_each = zeros(10,1);
     for j=(i-1) * size_of_step + 1:i *size_of_step
-        
+        if j==46
+            j;
         base_pattern = source(j,:);
         patterns = padarray(base_pattern,[0 256],0,'both');
         [amps, delays_gs] = calculateGS(patterns,false);
@@ -292,6 +293,7 @@ for i=1:3
         total_mse_conv(1,:,i) = mse_gs_conv';
         total_mse_conv(2,:,i) = mse_0_conv';
         total_mse_conv(3,:,i) = mse_1_conv';
+    end
 end
 
 full.gs = success_gs_total;
@@ -307,7 +309,7 @@ else
     save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi integers.mat' full
 end
 %%
-mode = 'floats';
+mode = 'integers';
 success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi.mat';
 MSE_conv_image = 'results/results comparision success MSE conv only gs 0.tif';
 success_rate_image = 'results/results comparision success only gs 0.tif';
@@ -896,6 +898,7 @@ set(gca,'FontSize',12,'FontName','Times New Roman')
 hold on
 errorbar(x,y_success,std_success,'k','LineStyle','none')
 %%
+init_field
 separation_factor = 1.5;
 x_min = -(256 - 1) * pitch/separation_factor;
 x_max = 256 * pitch/separation_factor;
@@ -974,11 +977,15 @@ for i=1:3
     I_FSP1_z0 = abs(E_FSP1_z0).^2;
     I_FSP1_z0 = I_FSP1_z0 ./ max(max(I_FSP1_z0));
     I_FSP1_z0 = I_FSP1_z0(:,512 - range_x:512 + range_x);
-    figure
+    I_FSP1_z0 = squeeze(create_new_image(delays_gs,amps,100));
+    fig = figure;
+    %fig.Position = [100 100 1280 * 1 1020 * 1];
     %a = subplot(3,4,1 + 4 * (i-1));
-    imagesc(x_for_image * 1e3,z * 1e3,I_FSP1_z0); colormap hot; axis square; axis on; zoom(1);
-    a = gca;
-    if i == 1
+    %imagesc(x_for_image * 1e3,z * 1e3,I_FSP1_z0); colormap hot; axis square; axis on; zoom(1);
+    a = subplot(2,2,1);
+    imagesc(x_full * 1e3,z * 1e3,I_FSP1_z0); colormap hot; axis square; axis on; zoom(1);
+    %a = gca;
+    if true
         xlabel('x [mm]','FontSize',26); ylabel('z [mm]','FontSize',26);
         a.FontSize = 26;
         pos1 = get(a,'Position');
@@ -988,41 +995,63 @@ for i=1:3
         set(gca,'xticklabel',[])
         set(gca,'yticklabel',[])
     end
-    hgexport(gcf, ['results/images for pattern/CW ' int2str(sep) '.tif'], style, 'Format', 'tiff');
+    %hgexport(gcf, ['results/images for pattern/CW ' int2str(sep) '.tif'], style, 'Format', 'tiff');
     %subplot(3,4,2 + 4 * (i-1))
-    figure
+    a = subplot(2,2,2);
+    %figure
     imagesc(x * 1e3,z_field * 1e3,im_gs);colormap hot; axis square; axis on; zoom(1);
-    set(gca,'xticklabel',[])
-    set(gca,'yticklabel',[])
-    hgexport(gcf, ['results/images for pattern/GS ' int2str(sep) '.tif'], style, 'Format', 'tiff');
+    %set(gca,'xticklabel',[])
+    %set(gca,'yticklabel',[])
+    %a = gca;
+    xlabel('x [mm]','FontSize',26); ylabel('z [mm]','FontSize',26);
+    a.FontSize = 26;
+    pos1 = get(a,'Position');
+    colorbar('eastoutside')
+    set(a,'Position',pos1)
+    %hgexport(gcf, ['results/images for pattern/GS ' int2str(sep) '.tif'], style, 'Format', 'tiff');
 
 
-    figure
+    %figure
+    a = subplot(2,2,3);
     imagesc(x * 1e3,z_field * 1e3,im_0);colormap hot; axis square; axis on; zoom(1);
-    set(gca,'xticklabel',[])
-    set(gca,'yticklabel',[])
-    hgexport(gcf, ['results/images for pattern/USDL ' int2str(sep) '.tif'], style, 'Format', 'tiff');
+%     set(gca,'xticklabel',[])
+%     set(gca,'yticklabel',[])
+%     a = gca;
+    xlabel('x [mm]','FontSize',26); ylabel('z [mm]','FontSize',26);
+    a.FontSize = 26;
+    pos1 = get(a,'Position');
+    colorbar('eastoutside')
+    set(a,'Position',pos1)
+    
+    %hgexport(gcf, ['results/images for pattern/USDL ' int2str(sep) '.tif'], style, 'Format', 'tiff');
 
-    figure
+    %figure
+    a = subplot(2,2,4);
     [amps, delays_gs] = calculateGS(patterns,false);
     delays_gs = normalize_delays(delays_gs);
     line = im_gs(round(size(im_gs,1)/2),:);
     line = line - min(line);
     line = line ./ max(line);
-    %line = create_new_line(delays_gs,amps,1,separation_factor);
-    %line = line(256 - range_x:256 + range_x);
-    plot(x * 1e3,line,'LineWidth',2); axis tight square; axis on;
-    a = gca;    
+    line = create_new_line(delays_gs,amps,1,separation_factor);
+    %[~,~,widths,~] = findpeaks(line,x_full,'MinPeakHeight',0.5,'WidthReference','halfheight');    %line = line(256 - range_x:256 + range_x);
+    %widths
+    %means_gs = mean(widths)
+    plot(x_full * 1e3,line,'LineWidth',2); axis tight square; axis on;
+    %a = gca;    
     a.FontSize = 26;
     xlabel('x [mm]','FontSize',26); ylabel('Intensity [a.u]', FontSize=26);
     hold on
     line = im_0(round(size(im_0,1)/2),:);
     line = line - min(line);
     line = line ./ max(line);
-    %line = create_new_line(delays_model,amps,1,separation_factor);
+    line = create_new_line(delays_model,amps,1,separation_factor);
+    %[~,~,widths,~] = findpeaks(line,x_full,'MinPeakHeight',0.5,'MinPeakProminence',0.2,'WidthReference','halfheight');    %line = line(256 - range_x:256 + range_x);
+    %widths
+    %means_net = mean(widths)
     %line = line(256 - range_x:256 + range_x);
-    plot(x * 1e3,line,'LineWidth',2);
-    hgexport(gcf, ['results/images for pattern/cross section ' int2str(sep) '.tif'], style, 'Format', 'tiff');
+    plot(x_full * 1e3,line,'LineWidth',2);
+    %hgexport(gcf, ['results/images for pattern/cross section ' int2str(sep) '.tif'], style, 'Format', 'tiff');
+    legend({'GS 1-cycle','USDL'})
     close all
 end
 % fig = figure;

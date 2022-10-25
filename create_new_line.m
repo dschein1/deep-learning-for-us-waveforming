@@ -47,6 +47,7 @@ function total_result = create_new_line(delays,	amp,num_cycles,spacing_factor)
         p = vecnorm(temp,2,1);
         p = abs(p);
         p = p - min(min(p));
+        %total_result(i,:) = p;
         total_result(i,:) = p/max(max(p)) ;
     end
 %     

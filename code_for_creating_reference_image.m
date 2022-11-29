@@ -91,6 +91,8 @@ for index=1:numel(files)
                              if abs(P(m,n))>15000
                                 P(m,n) = 15000;
                              end
+
+
                 %              P(m,n)=max(data(m,n).signal);
                 %              P(m,n)=sum(abs(data(m,n).signal))/10000;
                 %              P(m,n)=sqrt(mean(data(m,n).signal.^2));
@@ -100,9 +102,24 @@ for index=1:numel(files)
                          end
                      end
                 end
+                sum(P(isnan(P)))
                 P(isnan(P)) = 0;
-                P = abs(P).^2;
-                P = medfilt2(P);
+                P = abs(P).^2;         
+
+                if contains(file_.name,"3 focus test 2") && strcmp(to_add,'gs')
+%                     for m=2:size(data,1) - 1
+%                      for n=2:size(data,2) - 1
+%                         if abs(P(m,n)) < 100000
+%                             l = abs([ P(m+1,n) P(m+1,n+1) P(m,n+1) P(m+1,n-1) P(m - 1,n) P(m-1,n + 1) P(m,n-1) P(m-1,n-1)]);
+%                            P(m,n) = mean(l( l > 100000));
+%                         end
+%                      end
+%                     end
+                    P = imfill(P,'holes');
+                    P = medfilt2(P,[4,4]);
+                else           
+                    P = medfilt2(P);
+                end
                 if strcmp(to_add,'net')
                     data_net = P;
                 else

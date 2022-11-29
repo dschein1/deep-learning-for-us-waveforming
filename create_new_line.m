@@ -1,12 +1,12 @@
-function total_result = create_new_line(delays,	amp,num_cycles,spacing_factor)
+function total_result = create_new_line(delays,	amp,num_cycles,spacing_factor,depth)
     arguments
     delays (1,:)
     amp (1,:) = ones(1,128)
     num_cycles = 1
     spacing_factor = 3
+    depth = 40e-3
     end
     init_field
-    depth = 40e-3;
     Number_of_cycles=num_cycles; % Number of transmitted cycles. 1 for a single pulse
     f0 = 4.464e6; 
     c = 1490; % water in room temperature m/sec (in body  v = 1540)

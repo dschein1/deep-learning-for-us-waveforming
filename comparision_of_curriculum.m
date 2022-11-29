@@ -123,8 +123,8 @@ for i=1:3
         delays_gs = normalize_delays(delays_gs);
         delays_0 = normalize_delays(delays_step_0(j,:));
         delays_1 = normalize_delays(delays_step_1(j,:));
-        line_at_depth_gs = create_new_line(delays_gs);
-        line_at_depth_0 = create_new_line(delays_0);
+        line_at_depth_gs = create_new_line(delays_gs,ones(1,128),2,3,40e-3);
+        line_at_depth_0 = create_new_line(delays_0,ones(1,128),2,3,40e-3);
         %line_at_depth_1 = create_new_line(delays_1);
         [pks_base,locs_base,widths_base ,~] = findpeaks(base_pattern,x_full_gs,'MinPeakHeight',peak_height);
         locs_base = locs_base + abs(x_min);
@@ -148,7 +148,7 @@ for i=1:3
             j;
         end
         if num_peaks < 11 && num_peaks > 0
-            if (num_peaks ~= length(pks_gs) || num_peaks ~= length(pks_0))  && j < 100
+            if (num_peaks ~= length(pks_gs) || num_peaks ~= length(pks_0))  && j > 10000000
                 im_gs = squeeze(create_new_image(delays_gs));
                 im_0 = squeeze (create_new_image(delays_0));
                 %im_1 = squeeze(create_new_image(delays_1));
@@ -304,21 +304,21 @@ full.total_amount = total_amounts;
 full.total_mse = total_mse;
 full.total_mse_conv = total_mse_conv;
 if strcmp(mode,'floats')
-    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi.mat' full
+    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi 2 cycles.mat' full
 else
-    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi integers.mat' full
+    save 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi integers 2 cycles.mat' full
 end
 %%
 mode = 'integers';
-success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi.mat';
-MSE_conv_image = 'results/results comparision success MSE conv only gs 0.tif';
-success_rate_image = 'results/results comparision success only gs 0.tif';
-MSE_image = 'results/results comparision success MSE only gs 0.tif';
+success_name = 'py to matlab'\'success rate 3 repeats 10,000 each gs,net single,net multi 2 cycles.mat';
+MSE_conv_image = 'results/results comparision success MSE conv only gs 0 2 cycles.tif';
+success_rate_image = 'results/results comparision success only gs 0 2 cycles.tif';
+MSE_image = 'results/results comparision success MSE only gs 0 2 cycles.tif';
 if strcmp(mode,'integers')
-    success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi integers.mat';
-    success_rate_image = 'results/results comparision success only gs 0 integers.tif';
-    MSE_image = 'results/results comparision success MSE only gs 0 integers.tif';
-    MSE_conv_image = 'results/results comparision success MSE conv only gs 0 integers.tif';
+    success_name = 'py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi integers 2 cycles.mat';
+    success_rate_image = 'results/results comparision success only gs 0 integers 2 cycles.tif';
+    MSE_image = 'results/results comparision success MSE only gs 0 integers 2 cycles.tif';
+    MSE_conv_image = 'results/results comparision success MSE conv only gs 0 integers 2 cycles.tif';
 end
 full = load(success_name);
 total_results = full.full.total_results;

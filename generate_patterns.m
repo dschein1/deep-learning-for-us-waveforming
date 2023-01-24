@@ -1,11 +1,13 @@
-function patterns = generate_patterns(batch_size,N, num_focus)
+function patterns = generate_patterns(batch_size,N, num_focus, distribution)
     patterns = zeros(batch_size,N);
-    number_in_each = 2 * randn(batch_size,1) + 5;
-    %number_in_each = randi(2 ^ (num_focus - 1),batch_size,1);
-    %number_in_each = floor(log2(number_in_each)) + 1;
-    number_in_each = floor(number_in_each) + 1;
-    number_in_each(number_in_each > 10) = 10;
-    number_in_each(number_in_each < 1) = 1;
+    if strcmp(distribution,'uniform')
+        number_in_each = reshape(repmat(1:10,round(batch_size / 10), 1), batch_size, 1);
+    else
+        number_in_each = 2 * randn(batch_size,1) + 5;
+        number_in_each = floor(number_in_each) + 1;
+        number_in_each(number_in_each > 10) = 10;
+        number_in_each(number_in_each < 1) = 1;
+    end
     Frequancy = 4.464e6; 
     v = 1490; % water in room temperature m/sec (in body  v = 1540)
     Wavelength = v/Frequancy;

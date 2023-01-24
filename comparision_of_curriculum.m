@@ -41,19 +41,212 @@ subplot(1,2,1)
 plot(x_full,line_base); title('line at 40 mm from base net')
 subplot(1,3,2)
 plot(x_full,line_1); title('line at 40 mm from step 1 net')
-
+%%  
+%%% generate data
+generate_data(4e6, false, 40e-3);
+generate_data(1e6, false, 60e-3); 
 %%
-figure
-subplot(1,2,1)
-findpeaks(line_base,x_full,'MinPeakProminence',0.05,MinPeakHeight=0.2);
-[pks,locs,widths_base,proms] = findpeaks(line_base,x_full,'MinPeakProminence',0.3); title('peaks from net base')
-widths_base
-subplot(1,2,2)
-findpeaks(line_1,x_full,'MinPeakProminence',0.05,MinPeakHeight=0.3)
-[pks,locs,widths_1,proms] = findpeaks(line_1,x_full,'MinPeakProminence',0.3); title('peaks from net step 1')
-widths_1
+%%% generate uniform data for comparision
+generate_data(1e5, false, 40e-3, 'uniform');
+%%
+%%% compare multiple depths
+depths_to_test = (30:50) * 1e-3;
+mode = 'integers';
+save_examples = false;
+cycles = 1;
+success_rate_image = 'results\results from comparision multiple depths.tif';
+mse_image = 'results\mse from comparision multiple depths.tif';
 
-mean(widths_base - widths_1)
+if strcmp(mode,'floats')
+    %loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision uniform.mat');
+    loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision.mat');
+else
+    %loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparision uniform integers.mat');
+    loaded_for_comparision = load('C:\Users\DrorSchein\Desktop\thesis\thesis\py to matlab\batch for comparisionintegers.mat');
+end
+folder_path = '';
+if save_examples == true
+    folder_path = append('results/',num2str(cycles),' cycles/');
+    mkdir(folder_path);
+end
+source_patterns = loaded_for_comparision.source;
+convolved_patterns = loaded_for_comparision.x_acc;
+delays_net_0 = loaded_for_comparision.from_net_step_0;
+delays_net_1 = loaded_for_comparision.from_net_step_1;
+total_mse_across_all_depths = zeros(2, length(depths_to_test));
+total_mse_std_across_all_depths = zeros(2, length(depths_to_test));
+total_results_across_all_depths = zeros(2, length(depths_to_test));
+total_results_std_across_all_depths = zeros(2, length(depths_to_test));
+amount_to_compute = 15000;
+source_patterns = source_patterns(1:amount_to_compute, :);
+convolved_patterns = convolved_patterns(1:amount_to_compute, :);
+delays_net_0 = delays_net_0(1:amount_to_compute, :);
+delays_net_1 = delays_net_1(1:amount_to_compute, :);
+parfor i=1 : length(depths_to_test)
+    init_field
+    [total_mse_conv, total_results, total_amounts] = compute_comparision( ...
+        source_patterns, ...
+        convolved_patterns, ...
+        delays_net_0, ...
+        delays_net_1, ...
+        cycles, ...
+        depths_to_test(i), ...
+        mode, ...
+        folder_path, ...
+        save_examples);
+    results_summed = sum(total_results, 2);
+    amounts_summed = sum(total_amounts, 1);
+    mse_summed = sum(total_mse_conv, 2);
+    results_averaged_with_iterations = zeros(2,3);
+    mse_averaged_with_iterations = zeros(2,3);
+    results_averaged_with_iterations(1,:) = results_summed(1, :) ./ amounts_summed;
+    results_averaged_with_iterations(2,:) = results_summed(2, :) ./ amounts_summed;
+    mse_averaged_with_iterations(1,:) = mse_summed(1, :) ./ amounts_summed;
+    mse_averaged_with_iterations(2,:) = mse_summed(2, :) ./ amounts_summed;
+    total_results_across_all_depths(:, i) = mean(results_averaged_with_iterations, 2);
+    total_results_std_across_all_depths(:, i) = std(results_averaged_with_iterations, 0, 2);
+    total_mse_across_all_depths(:, i) = mean(mse_averaged_with_iterations, 2);
+    total_mse_std_across_all_depths(:, i) = std(mse_averaged_with_iterations, 0, 2);
+    field_end();
+    clear_mex();
+end
+
+data_to_save.results = total_results_across_all_depths;
+data_to_save.mse = total_mse_across_all_depths;
+data_to_save.results_std = total_results_std_across_all_depths;
+data_to_save.mse_std = total_mse_std_across_all_depths;
+save 'py to matlab'\'results from comparision multiple depths.mat' data_to_save
+
+figure(1);
+plot(depths_to_test * 1e3, data_to_save.results(1,:), 'LineWidth',2);
+hold on
+plot(depths_to_test * 1e3, data_to_save.results(2,:), 'LineWidth',2);
+
+axis tight; 
+ax = gca;
+ax.FontSize = 26;
+ylabel('Success rate','FontSize',26); xlabel('Depth [mm]','FontSize',26)
+legend({'GS 1-cycle' 'USDL'},'FontSize',26)
+errorbar(depths_to_test * 1e3, data_to_save.results(1,:), data_to_save.results_std(1, :), 'k', 'linestyle', 'none', 'HandleVisibility', 'off', 'LineWidth', 1);
+errorbar(depths_to_test * 1e3, data_to_save.results(2,:), data_to_save.results_std(2, :), 'k', 'linestyle', 'none', 'HandleVisibility', 'off', 'LineWidth', 1);
+
+grid off
+
+hgexport(gcf, [success_rate_image], hgexport('factorystyle'), 'Format', 'tiff');
+figure(2);
+plot(depths_to_test * 1e3, data_to_save.mse(1,:), 'LineWidth',2);
+hold on
+plot(depths_to_test * 1e3, data_to_save.mse(2,:), 'LineWidth',2);
+axis tight; 
+ax = gca;
+ax.FontSize = 26;
+ylabel('MSE','FontSize',26); xlabel('Depth [mm]','FontSize',26)
+legend({'GS 1-cycle' 'USDL'},'FontSize',26)
+errorbar(depths_to_test * 1e3, data_to_save.mse(1,:), data_to_save.mse_std(1, :), 'k', 'linestyle', 'none', 'HandleVisibility', 'off', 'LineWidth', 1);
+errorbar(depths_to_test * 1e3, data_to_save.mse(2,:), data_to_save.mse_std(2, :), 'k', 'linestyle', 'none', 'HandleVisibility', 'off', 'LineWidth', 1);
+
+grid off
+hgexport(gcf, [mse_image], hgexport('factorystyle'), 'Format', 'tiff');
+
+%%% compare affect of changing number of cycles
+num_cycles_to_test = [1, 2, 3, 4, 5, 6, 7, 8];
+parfor cycle=num_cycles_to_test
+    cycle
+    compare_methods('floats',cycle, true);
+    %compare_methods('integers',cycle);
+    field_end();
+    clear_mex();
+end
+
+%%% display comparision from changing number of cycles
+num_cycles_to_test = [1, 2, 3, 4, 5, 6, 7, 8];
+for cycle=num_cycles_to_test
+    display_comparision('floats', cycle);
+end
+
+
+%%% Display comparision over multiple number of cycles
+success_rate_image = 'results/results comparision success rate cycles comparision.tif';
+mse_rate_image = 'results/results comparision mse cycles comparision.tif';
+range_of_cycles_to_compare = 8;
+mean_int = zeros(2, range_of_cycles_to_compare, 3);
+mean_mse = zeros(2, range_of_cycles_to_compare, 3);
+for cycle=1:range_of_cycles_to_compare
+    base_path = "py to matlab\success rate 3 repeats 10,000 each gs,net single,net multi ";
+    path_integers = append(base_path, num2str(cycle), ' cycles.mat');
+    loaded_intergers = load(path_integers);
+    total_results = loaded_intergers.full.total_results;
+    total_amounts = loaded_intergers.full.total_amount;
+    pct = zeros(2, 3);
+    summed_success = squeeze(sum(total_results,2));
+    summed_amounts = squeeze(sum(total_amounts, 1));
+    pct(1, :) = summed_success(1,:) ./ summed_amounts;
+    pct(2, :) = summed_success(2,:) ./ summed_amounts;
+    mean_int(:,cycle,:) = pct;
+    total_results = loaded_intergers.full.total_mse_conv;
+    mse_conv_total(1, :, :) = squeeze(total_results(1, :, :)) .* total_amounts;
+    mse_conv_total(2, :, :) = squeeze(total_results(2, :, :)) .* total_amounts;
+    summed_mse = sum(mse_conv_total, 2);
+    pct(1, :) = summed_mse(1, :) ./ summed_amounts;
+    pct(2, :) = summed_mse(2, :) ./ summed_amounts;
+    mean_mse(:, cycle, :) = pct;
+end
+general_mean = mean(mean_int, 3);
+general_std = std(mean_int, 0, 3);
+general_mse = mean(mean_mse, 3);
+general_mse_std = std(mean_mse, 0, 3);
+
+y = squeeze(general_mean)';
+error_bar = squeeze(general_std)';    
+fig = figure;
+fig.Position = [50 50 1280 * 0.9 1020 * 0.9];
+h = plot(y,'LineWidth',2); axis square;
+ax = gca;
+ax.FontSize = 26;
+ylabel('Success rate','FontSize',26); xlabel('Number of cycles','FontSize',26)
+legend({'GS 1-cycle' 'USDL'},'FontSize',26)
+hold on
+errorbar(y,error_bar,'k','linestyle','none','HandleVisibility','off','LineWidth',1);
+grid off
+hgexport(gcf, [success_rate_image], hgexport('factorystyle'), 'Format', 'tiff');
+
+y = squeeze(general_mse)';
+error_bar = squeeze(general_mse_std)';    
+fig = figure;
+fig.Position = [50 50 1280 * 0.9 1020 * 0.9];
+h = plot(y,'LineWidth',2); axis square;
+ax = gca;
+ax.FontSize = 26;
+ylabel('MSE','FontSize',26); xlabel('Number of cycles','FontSize',26)
+legend({'GS 1-cycle' 'USDL'},'FontSize',26)
+hold on
+errorbar(y,error_bar,'k','linestyle','none','HandleVisibility','off','LineWidth',1);
+grid off
+hgexport(gcf, [mse_rate_image], hgexport('factorystyle'), 'Format', 'tiff');  
+%%
+%%% compare methods at depth of 60
+compare_methods('integers', 1, false, 60e-3);
+display_comparision('integers', 1, 60e-3);
+
+compare_methods('float', 1, false, 60e-3);
+display_comparision('float', 1, 60e-3);
+
+generate_data(5e6, 1024, 10, false);
+%%
+%%% compare affect of changing number of cycles
+num_cycles_to_test = [1, 2, 3, 4, 5, 6, 7, 8];
+parfor cycle=num_cycles_to_test
+    cycle
+    compare_methods('floats',cycle, true);
+    %compare_methods('integers',cycle);
+end
+%% 
+%%% display comparision from changing number of cycles
+num_cycles_to_test = [1, 2, 3, 4, 5, 6, 7, 8];
+for cycle=num_cycles_to_test
+    display_comparision('floats', cycle);
+end
+  
 %%
 success_gs_total = [];
 success_gs_multi_total = [];
@@ -115,8 +308,7 @@ for i=1:3
     success_1 = zeros(1,10)';
     num_for_each = zeros(10,1);
     for j=(i-1) * size_of_step + 1:i *size_of_step
-        if j==46
-            j;
+
         base_pattern = source(j,:);
         patterns = padarray(base_pattern,[0 256],0,'both');
         [amps, delays_gs] = calculateGS(patterns,false);
@@ -144,9 +336,6 @@ for i=1:3
         
         
         num_peaks = length(pks_base);
-        if num_peaks == 3
-            j;
-        end
         if num_peaks < 11 && num_peaks > 0
             if (num_peaks ~= length(pks_gs) || num_peaks ~= length(pks_0))  && j > 10000000
                 im_gs = squeeze(create_new_image(delays_gs));
@@ -293,7 +482,7 @@ for i=1:3
         total_mse_conv(1,:,i) = mse_gs_conv';
         total_mse_conv(2,:,i) = mse_0_conv';
         total_mse_conv(3,:,i) = mse_1_conv';
-    end
+
 end
 
 full.gs = success_gs_total;
@@ -1238,4 +1427,17 @@ function [peaks,locs] = extract_peaks(input, pattern)
             break
         end
     end
+end
+
+function extract_mean(full_data)
+    total_results = full_data.full.total_results;
+    total_amounts = full_data.full.total_amount;
+    pct = zeros(2,10,3);
+    pct(1,:,:)= squeeze(total_results(1,:,:)) ./ total_amounts;
+    pct(2,:,:) = squeeze(total_results(2,:,:)) ./ total_amounts;
+    pct_total = mean(pct,2);
+
+end
+function clear_mex
+    clear mex;
 end

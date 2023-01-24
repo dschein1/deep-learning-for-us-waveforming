@@ -92,15 +92,18 @@ def convert_csv_to_parquet(path):
         print('passed index setting')
     else:
         data = dd.read_csv(path +'.csv',dtype =  column_types).set_index('0').astype(column_types)
-    print(data.dtypes,data.index)
+    print(data.dtypes,data.index, len(data))
     n = len(data)
     perm = np.random.permutation(n)
     train_idx = np.sort(perm[:round(0.7*n)])
     val_idx = np.sort(perm[round(0.7*n):round(0.8*n)])
     test_idx = np.sort(perm[round(0.8*n):])
     train_data = data.loc[train_idx,:].to_parquet(path + '/train.parquet')
+    print("created train data")
     val_data = data.loc[val_idx,:].to_parquet(path + '/val.parquet')
+    print("created validation data")
     test_data = data.loc[test_idx,:].to_parquet(path + '/test.parquet')
+    print("created test data")
     #data.set_index('0',sorted = True).to_parquet(path + '.parquet')
     #data.to_pickle(path +'.gzip')
 
@@ -399,6 +402,7 @@ class baseDataSet(Dataset):
                     from_file = False, from_singleton = False,type_of_data = 'train', lazy = False,return_both = False,return_integers = False):
 
         #self.data = pd.read_csv(csv_file,header = None, index_col = 0,skiprows = )
+        print(file_path)
         self.from_file = from_file
         self.return_integers = return_integers
         self.from_singleton = False
@@ -545,31 +549,29 @@ class baseDataSet(Dataset):
         self.transform_y = transform_y
 
 class datasetManager():
-    def __init__(self,seq_length = 50,csv_file = "C:/Users/drors/Desktop/code for thesis/data.csv",orig = "C:/Users/drors/Desktop/code for thesis/data original.csv",
+    def __init__(self,seq_length = 50,csv_file = None, orig = "C:/Users/drors/Desktop/code for thesis/data original.csv",
                     num_focuses = 0):
         #self.eng = []
         #for i in range(configuration.num_workers):
         #    self.eng.append(matlab.engine.start_matlab())
         #    self.eng[i].init_field(nargout=0)
-
+        print(csv_file, configuration.mode != 'synth' and csv_file == None)
         if num_focuses != 0:
             if configuration.out_size == 256:
                 path = f'{num_focuses} focus data delays amps'
             else:
                 path = f'{num_focuses} focus data delays'
             csv_file = os.path.join(configuration.base_path_datasets,path)
-            orig = os.path.join(configuration.base_path_datasets,path)
-        elif configuration.mode != 'synth':
+        elif configuration.mode != 'synth' and csv_file == None:
             (step,name) = get_last_step(configuration.base_path_datasets)
             print(step,name)
             path = '10 focus data delays'
             if step != -1:
                 path = name
             csv_file = os.path.join(configuration.base_path_datasets,path)
-            orig = os.path.join(configuration.base_path_datasets,path)
             
-                  
-
+        orig = csv_file  
+        print(csv_file)
         self.csv_file = csv_file
         if orig == configuration.path_combined:
             self.mode = 'both'

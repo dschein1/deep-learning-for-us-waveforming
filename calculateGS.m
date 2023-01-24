@@ -1,8 +1,8 @@
-function [Transducer_Amp,Transducer_Phase] = calculateGS(desired_Output_Shift, allow_amps)
+function [Transducer_Amp,Transducer_Phase] = calculateGS(desired_Output_Shift, allow_amps, depth)
     N = 1024;
     Transducer = zeros(1,N);
     GS = 10;
-    DZ = 40e-3; % Distance to pattern 
+    DZ = depth; % Distance to pattern 
     Frequancy = 4.464e6; 
     v = 1490; % water in room temperature m/sec (in body  v = 1540)
     Wavelength = v/Frequancy;

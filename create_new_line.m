@@ -50,6 +50,7 @@ function total_result = create_new_line(delays,	amp,num_cycles,spacing_factor,de
         %total_result(i,:) = p;
         total_result(i,:) = p/max(max(p)) ;
     end
+    
 %     
 %     for ii=1:length(x)
 %         clc; ii
